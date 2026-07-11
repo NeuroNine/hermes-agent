@@ -16249,6 +16249,96 @@ async def get_models_analytics(days: int = 30, profile: Optional[str] = None):
     """Return model analytics without blocking the serving event loop."""
     return await asyncio.to_thread(_get_models_analytics, days, profile)
 
+@app.get("/api/cost/providers")
+async def get_provider_costs():
+    """Live provider cost/balance snapshot.
+
+    Calls the existing account_usage fetchers for each configured provider
+    and returns a unified view of balances and usage windows.  Fail-open:
+    if a provider's API is unreachable or unconfigured, it's returned with
+    an ``unavailable`` flag rather than failing the whole request.
+    """
+    import json as _json
+    from agent.account_usage import (
+        fetch_account_usage,
+        nous_credits_lines,
+        build_credits_view,
+    )
+
+    providers: list[dict] = []
+
+    # ── Nous / umans ──────────────────────────────────────────────────────
+    try:
+        view = build_credits_view(markdown=False, timeout=8.0)
+        if view and view.logged_in:
+            providers.append({
+                "provider": "nous",
+                "label": "Nous / umans",
+                "logged_in": True,
+                "balance_lines": list(view.balance_lines),
+                "identity": view.identity_line,
+                "topup_url": view.topup_url,
+                "depleted": view.depleted,
+                "source": "portal-account",
+            })
+        else:
+            providers.append({
+                "provider": "nous",
+                "label": "Nous / umans",
+                "logged_in": False,
+                "source": "portal-account",
+            })
+    except Exception as exc:
+        providers.append({
+            "provider": "nous",
+            "label": "Nous / umans",
+            "logged_in": False,
+            "error": str(exc),
+            "source": "portal-account",
+        })
+
+    # ── OpenRouter ────────────────────────────────────────────────────────
+    try:
+        snapshot = fetch_account_usage("openrouter")
+        if snapshot and snapshot.available:
+            windows = []
+            for w in snapshot.windows:
+                windows.append({
+                    "label": w.label,
+                    "used_percent": w.used_percent,
+                    "reset_at": w.reset_at.isoformat() if w.reset_at else None,
+                    "detail": w.detail,
+                })
+            providers.append({
+                "provider": "openrouter",
+                "label": "OpenRouter",
+                "logged_in": True,
+                "plan": snapshot.plan,
+                "windows": windows,
+                "details": list(snapshot.details),
+                "source": snapshot.source,
+                "fetched_at": snapshot.fetched_at.isoformat(),
+            })
+        else:
+            reason = snapshot.unavailable_reason if snapshot else "No API key configured"
+            providers.append({
+                "provider": "openrouter",
+                "label": "OpenRouter",
+                "logged_in": False,
+                "unavailable_reason": reason,
+                "source": "credits_api",
+            })
+    except Exception as exc:
+        providers.append({
+            "provider": "openrouter",
+            "label": "OpenRouter",
+            "logged_in": False,
+            "error": str(exc),
+            "source": "credits_api",
+        })
+
+    return {"providers": providers}
+
 
 # ---------------------------------------------------------------------------
 # /api/pty — PTY-over-WebSocket bridge for the dashboard "Chat" tab.
@@ -18038,6 +18128,7 @@ _BUILTIN_DASHBOARD_THEMES = [
     {"name": "mono",      "label": "Mono",           "description": "Clean grayscale — minimal and focused"},
     {"name": "cyberpunk", "label": "Cyberpunk",      "description": "Neon green on black — matrix terminal"},
     {"name": "rose",      "label": "Rosé",           "description": "Soft pink and warm ivory — easy on the eyes"},
+    {"name": "helm",      "label": "HELM Bridge",    "description": "Ship AI bridge — deep space blue with cyan accents"},
 ]
 
 

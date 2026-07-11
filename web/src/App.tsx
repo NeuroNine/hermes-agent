@@ -26,6 +26,7 @@ import {
   Code,
   Cpu,
   Database,
+  DollarSign,
   Download,
   Eye,
   FolderOpen,
@@ -33,6 +34,7 @@ import {
   Globe,
   Heart,
   KeyRound,
+  LayoutDashboard,
   Menu,
   MessageSquare,
   Package,
@@ -47,6 +49,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  Telescope,
   Terminal,
   Users,
   Webhook,
@@ -90,6 +93,9 @@ import PairingPage from "@/pages/PairingPage";
 import ChannelsPage from "@/pages/ChannelsPage";
 import WebhooksPage from "@/pages/WebhooksPage";
 import SystemPage from "@/pages/SystemPage";
+import ResearchPage from "@/pages/ResearchPage";
+import CostPage from "@/pages/CostPage";
+import HomePage from "@/pages/HomePage";
 import ChatPage from "@/pages/ChatPage";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -101,10 +107,6 @@ import { useTheme } from "@/themes";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
 import { api } from "@/lib/api";
 import type { StatusResponse, UpdateCheckResponse } from "@/lib/api";
-
-function RootRedirect() {
-  return <Navigate to="/sessions" replace />;
-}
 
 function UnknownRouteFallback({ pluginsLoading }: { pluginsLoading: boolean }) {
   if (pluginsLoading) {
@@ -131,7 +133,7 @@ const CHAT_NAV_ITEM: NavItem = {
  * and nav highlight keep working.
  */
 const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
-  "/": RootRedirect,
+  "/": HomePage,
   "/sessions": SessionsPage,
   "/files": FilesPage,
   "/analytics": AnalyticsPage,
@@ -145,6 +147,8 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/channels": ChannelsPage,
   "/webhooks": WebhooksPage,
   "/system": SystemPage,
+  "/research": ResearchPage,
+  "/cost": CostPage,
   "/profiles": ProfilesPage,
   "/profiles/new": ProfileBuilderPage,
   "/config": ConfigPage,
@@ -161,37 +165,40 @@ function ChatRouteSink() {
 }
 
 const BUILTIN_NAV_REST: NavItem[] = [
+  { path: "/", label: "Home", icon: LayoutDashboard },
   {
     path: "/sessions",
     labelKey: "sessions",
     label: "Sessions",
     icon: MessageSquare,
   },
-  { path: "/files", label: "Files", icon: FolderOpen },
-  {
-    path: "/analytics",
-    labelKey: "analytics",
-    label: "Analytics",
-    icon: BarChart3,
-  },
+  { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
+  { path: "/system", label: "System", icon: Wrench },
+  { path: "/config", labelKey: "config", label: "Config", icon: Settings },
+  { path: "/skills", labelKey: "skills", label: "Skills", icon: Package },
+  { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText },
   {
     path: "/models",
     labelKey: "models",
     label: "Models",
     icon: Cpu,
   },
-  { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText },
-  { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
-  { path: "/skills", labelKey: "skills", label: "Skills", icon: Package },
-  { path: "/plugins", labelKey: "plugins", label: "Plugins", icon: Puzzle },
-  { path: "/mcp", label: "MCP", icon: Plug },
+  { path: "/files", label: "Files", icon: FolderOpen },
   { path: "/channels", label: "Channels", icon: Radio },
+  { path: "/profiles", labelKey: "profiles", label: "Profiles", icon: Users },
+  {
+    path: "/analytics",
+    labelKey: "analytics",
+    label: "Analytics",
+    icon: BarChart3,
+  },
+  { path: "/mcp", label: "MCP", icon: Plug },
+  { path: "/plugins", labelKey: "plugins", label: "Plugins", icon: Puzzle },
   { path: "/webhooks", label: "Webhooks", icon: Webhook },
   { path: "/pairing", label: "Pairing", icon: ShieldCheck },
-  { path: "/profiles", labelKey: "profiles", label: "Profiles", icon: Users },
-  { path: "/config", labelKey: "config", label: "Config", icon: Settings },
+  { path: "/research", label: "Research", icon: Telescope },
+  { path: "/cost", label: "Cost", icon: DollarSign },
   { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
-  { path: "/system", label: "System", icon: Wrench },
   {
     path: "/docs",
     labelKey: "documentation",
@@ -835,7 +842,7 @@ function SidebarNavLink({
     >
       <NavLink
         to={path}
-        end={path === "/sessions"}
+        end={path === "/sessions" || path === "/"}
         onClick={closeMobile}
         aria-label={collapsed ? navLabel : undefined}
         onFocus={collapsed ? showTooltip : undefined}

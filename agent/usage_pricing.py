@@ -1056,16 +1056,29 @@ def _pricing_entry_from_metadata(
     if prompt is None and completion is None and request is None:
         return None
 
-    def _per_token_to_per_million(value: Optional[Decimal]) -> Optional[Decimal]:
+    def _normalize_to_per_million(value: Optional[Decimal]) -> Optional[Decimal]:
+        """Normalize a pricing value to cost-per-million-tokens.
+
+        OpenRouter and most OpenAI-compatible APIs return per-token prices
+        (e.g. 0.000001 = $0.000001/token = $1.00/M).  Some providers (umans,
+        and potentially others) return per-million prices directly (e.g. 1.4 =
+        $1.40/M).  A per-token price for even the most expensive model is
+        well under $0.01/token; a per-million price for even the cheapest
+        model is well above $0.01/M.  We use 0.01 as the threshold.
+        """
         if value is None:
             return None
+        if value > Decimal("0.01"):
+            # Already per-million — return as-is
+            return value
+        # Per-token — multiply by 1M to get per-million
         return value * _ONE_MILLION
 
     return PricingEntry(
-        input_cost_per_million=_per_token_to_per_million(prompt),
-        output_cost_per_million=_per_token_to_per_million(completion),
-        cache_read_cost_per_million=_per_token_to_per_million(cache_read),
-        cache_write_cost_per_million=_per_token_to_per_million(cache_write),
+        input_cost_per_million=_normalize_to_per_million(prompt),
+        output_cost_per_million=_normalize_to_per_million(completion),
+        cache_read_cost_per_million=_normalize_to_per_million(cache_read),
+        cache_write_cost_per_million=_normalize_to_per_million(cache_write),
         request_cost=request,
         source="provider_models_api",
         source_url=source_url,

@@ -469,6 +469,8 @@ export const api = {
     fetchJSON<AnalyticsResponse>(
       appendProfileParam(`/api/analytics/usage?days=${days}`, profile),
     ),
+  getProviderCosts: () =>
+    fetchJSON<ProviderCostResponse>(`/api/cost/providers`),
   getModelsAnalytics: (days: number, profile = getManagementProfile()) =>
     fetchJSON<ModelsAnalyticsResponse>(
       appendProfileParam(`/api/analytics/models?days=${days}`, profile),
@@ -2111,6 +2113,34 @@ export interface ModelsAnalyticsResponse {
     total_api_calls: number;
   };
   period_days: number;
+}
+
+export interface ProviderCostWindow {
+  label: string;
+  used_percent: number | null;
+  reset_at: string | null;
+  detail: string | null;
+}
+
+export interface ProviderCostEntry {
+  provider: string;
+  label: string;
+  logged_in: boolean;
+  balance_lines?: string[];
+  identity?: string | null;
+  topup_url?: string | null;
+  depleted?: boolean;
+  plan?: string | null;
+  windows?: ProviderCostWindow[];
+  details?: string[];
+  source?: string;
+  fetched_at?: string;
+  unavailable_reason?: string;
+  error?: string;
+}
+
+export interface ProviderCostResponse {
+  providers: ProviderCostEntry[];
 }
 
 export interface CronJobRepeat {
