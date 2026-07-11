@@ -201,6 +201,17 @@ async def auth_login(request: Request, provider: str, next: str = ""):
             login_url = f"{login_url}?next={quote(safe_next, safe='')}"
         return RedirectResponse(url=login_url, status_code=302)
 
+    # Password-only providers don't have an OAuth redirect flow — redirect to
+    # the login page which renders a credential form instead.
+    if getattr(p, "supports_password", False):
+        from hermes_cli.dashboard_auth.prefix import prefix_from_request
+        prefix = prefix_from_request(request)
+        login_url = f"{prefix}/login"
+        if next:
+            from urllib.parse import urlencode
+            login_url = f"{login_url}?{urlencode({'next': next, 'provider': provider})}"
+        return RedirectResponse(url=login_url, status_code=302)
+
     try:
         ls = p.start_login(redirect_uri=_redirect_uri(request))
     except ProviderError as e:

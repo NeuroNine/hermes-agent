@@ -228,6 +228,59 @@ export const defaultLargeTheme: DashboardTheme = {
   },
 };
 
+export const helmTheme: DashboardTheme = {
+  name: "helm",
+  label: "HELM Bridge",
+  description: "Ship AI bridge — deep space blue with cyan accents",
+  palette: {
+    background: { hex: "#060d1a", alpha: 1 },
+    midground: { hex: "#7dd3fc", alpha: 1 },
+    foreground: { hex: "#ffffff", alpha: 0 },
+    warmGlow: "rgba(56, 189, 248, 0.25)",
+    noiseOpacity: 0.7,
+  },
+  typography: {
+    ...DEFAULT_TYPOGRAPHY,
+    fontDisplay: `"Orbitron", ${SYSTEM_SANS}`,
+    fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`,
+    fontUrl:
+      "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap",
+  },
+  layout: {
+    radius: "0.375rem",
+    density: "comfortable",
+  },
+  colorOverrides: {
+    success: "#22d3ee",
+    warning: "#fbbf24",
+    destructive: "#f43f5e",
+    border: "rgba(125, 211, 252, 0.3)",
+  },
+  swatchColors: ["#060d1a", "#7dd3fc", "rgba(56, 189, 248, 0.25)"],
+  terminalBackground: "#040810",
+  terminalForeground: "#7dd3fc",
+  customCSS: `
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.05;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(125, 211, 252, 0.6) 0px,
+        rgba(125, 211, 252, 0.6) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+    }
+    #app-sidebar {
+      box-shadow: inset -1px 0 0 rgba(125, 211, 252, 0.15), 4px 0 24px rgba(56, 189, 248, 0.12);
+    }
+  `,
+};
+
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   default: defaultTheme,
   "default-large": defaultLargeTheme,
@@ -237,4 +290,5 @@ export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   mono: monoTheme,
   cyberpunk: cyberpunkTheme,
   rose: roseTheme,
+  helm: helmTheme,
 };
