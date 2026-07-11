@@ -51,6 +51,19 @@ interface UsageLogEntry {
   event?: string;
 }
 
+interface OpenRouterLogEntry {
+  ts: string;
+  balance: number;
+  total_credits: number;
+  total_usage: number;
+  key_usage: number;
+  key_usage_daily: number;
+  key_usage_weekly: number;
+  key_usage_monthly: number;
+  key_limit: number;
+  key_remaining: number;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function formatCost(n: number): string {
@@ -102,6 +115,29 @@ async function fetchUsageLog(): Promise<UsageLogEntry[]> {
     if (!data.text) return [];
     const lines = data.text.trim().split("\n").filter(Boolean);
     const entries: UsageLogEntry[] = [];
+    for (const line of lines) {
+      try {
+        entries.push(JSON.parse(line));
+      } catch {
+        // skip malformed
+      }
+    }
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
+async function fetchOpenRouterLog(): Promise<OpenRouterLogEntry[]> {
+  try {
+    const resp = await fetch(
+      `/api/fs/read-text?path=${encodeURIComponent(MONITOR_DIR + "/openrouter-log.jsonl")}`,
+    );
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (!data.text) return [];
+    const lines = data.text.trim().split("\n").filter(Boolean);
+    const entries: OpenRouterLogEntry[] = [];
     for (const line of lines) {
       try {
         entries.push(JSON.parse(line));
@@ -516,6 +552,297 @@ function CostByModelTable({ models }: { models: ModelCostRow[] }) {
   );
 }
 
+// ── OpenRouter Spend Chart ──────────────────────────────────────────────────
+
+function OpenRouterSpendChart({ entries }: { entries: OpenRouterLogEntry[] }) {
+  const data = useMemo(() => {
+    const recent = entries.slice(-96); // ~48h at 30-min intervals
+    if (recent.length === 0) return { points: [], maxBal: 20, minBal: 0 };
+    const points = recent.map((e) => ({
+      ts: e.ts,
+      balance: e.balance,
+      total_usage: e.total_usage,
+    }));
+    const maxBal = Math.max(...points.map((p) => p.balance), 20);
+    const minBal = Math.min(...points.map((p) => p.balance), 0);
+    return { points, maxBal: Math.ceil(maxBal), minBal: Math.floor(minBal) };
+  }, [entries]);
+
+  if (data.points.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground py-6 text-center">
+        No OpenRouter history yet. The logger cron job is collecting data — check back in 30 minutes.
+      </div>
+    );
+  }
+
+  const chartWidth = 500;
+  const chartHeight = 120;
+  const padding = { top: 8, right: 8, bottom: 16, left: 35 };
+  const plotW = chartWidth - padding.left - padding.right;
+  const plotH = chartHeight - padding.top - padding.bottom;
+
+  const range = data.maxBal - data.minBal || 1;
+  const xScale = (i: number) =>
+    padding.left + (i / Math.max(data.points.length - 1, 1)) * plotW;
+  const yScale = (val: number) =>
+    padding.top + plotH - ((val - data.minBal) / range) * plotH;
+
+  const balancePath = data.points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${xScale(i)} ${yScale(p.balance)}`)
+    .join(" ");
+
+  const usagePath = data.points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${xScale(i)} ${yScale(p.total_usage)}`)
+    .join(" ");
+
+  const last = data.points[data.points.length - 1];
+  const first = data.points[0];
+  const spendRate = last && first ? last.total_usage - first.total_usage : 0;
+  const hoursSpan = last && first
+    ? (new Date(last.ts).getTime() - new Date(first.ts).getTime()) / 3_600_000
+    : 0;
+  const dailyRate = hoursSpan > 0 ? (spendRate / hoursSpan) * 24 : 0;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-4 flex-wrap text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-0.5 bg-blue-400" />
+          <span className="text-muted-foreground">Balance</span>
+          <span className="font-medium text-foreground">${last.balance.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-0.5 bg-amber-500" />
+          <span className="text-muted-foreground">Cumulative Spend</span>
+          <span className="font-medium text-foreground">${last.total_usage.toFixed(2)}</span>
+        </div>
+        {dailyRate > 0 && (
+          <div className="flex items-center gap-1.5">
+            <TrendingDown className="w-3 h-3 text-muted-foreground" />
+            <span className="text-muted-foreground">Rate</span>
+            <span className="font-medium text-foreground">${dailyRate.toFixed(2)}/day</span>
+          </div>
+        )}
+      </div>
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full" style={{ maxHeight: "140px" }}>
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
+          const val = data.minBal + range * frac;
+          return (
+            <g key={frac}>
+              <line
+                x1={padding.left}
+                y1={yScale(val)}
+                x2={chartWidth - padding.right}
+                y2={yScale(val)}
+                stroke="currentColor"
+                className="text-border"
+                strokeWidth={0.5}
+              />
+              <text
+                x={padding.left - 5}
+                y={yScale(val) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground text-[8px]"
+              >
+                ${val.toFixed(0)}
+              </text>
+            </g>
+          );
+        })}
+        {/* Balance line */}
+        <path d={balancePath} fill="none" stroke="currentColor" className="text-blue-400" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+        {/* Cumulative spend line */}
+        <path d={usagePath} fill="none" stroke="currentColor" className="text-amber-500" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" opacity={0.8} />
+      </svg>
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>{formatTime(data.points[0]?.ts)}</span>
+        <span>{formatTime(last.ts)}</span>
+      </div>
+      {dailyRate > 0 && (
+        <div className="text-xs text-muted-foreground pt-1 border-t border-border/30">
+          At current rate: ${dailyRate.toFixed(2)}/day → ~${(dailyRate * 30).toFixed(2)}/month
+          {dailyRate * 30 > 20 && (
+            <span className="text-amber-500 ml-2">
+              ⚠ Exceeds Claude Code Pro ($20/mo) — consider shifting load
+            </span>
+          )}
+          {dailyRate * 30 <= 20 && dailyRate > 0 && (
+            <span className="text-emerald-500 ml-2">
+              ✓ Under Claude Code Pro ($20/mo) — OpenRouter is cheaper
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Subscription Comparison ──────────────────────────────────────────────────
+
+function SubscriptionComparison({
+  umansUsage,
+  orEntries,
+  analytics,
+  days,
+}: {
+  umansUsage: UsageLogEntry[];
+  orEntries: OpenRouterLogEntry[];
+  analytics: AnalyticsResponse | null;
+  days: number;
+}) {
+  // umans: $20/mo, 200 req / 5hr window, effectively unlimited tokens
+  const latestUmans = umansUsage[umansUsage.length - 1];
+  const umansRequestsUsed = latestUmans?.requests ?? 0;
+  const umansCap = latestUmans?.cap ?? 200;
+  const umansPct = umansCap > 0 ? (umansRequestsUsed / umansCap) * 100 : 0;
+
+  // OpenRouter: pay-per-token, tracked from log
+  const latestOR = orEntries[orEntries.length - 1];
+  const orBalance = latestOR?.balance ?? 0;
+  const orSpent = latestOR?.total_usage ?? 0;
+
+  // Hermes session cost (umans model, estimated)
+  const hermesEstCost = analytics?.totals?.total_estimated_cost ?? 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Wallet className="h-5 w-5 text-muted-foreground" />
+          <CardTitle className="text-base">Subscription Value Comparison</CardTitle>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          What you get for your money — {days}d window
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 md:grid-cols-3">
+          {/* umans */}
+          <div className="space-y-2 p-3 rounded-lg border border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">umans Pro</span>
+              </div>
+              <span className="text-lg font-bold">${UMANS_PLAN_COST}<span className="text-xs text-muted-foreground">/mo</span></span>
+            </div>
+            <div className="text-xs space-y-1 text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Model</span>
+                <span className="text-foreground">GLM-5.2</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Requests</span>
+                <span className="text-foreground">{umansRequestsUsed}/{umansCap} per 5hr</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tokens</span>
+                <span className="text-foreground">Unlimited</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Window used</span>
+                <span className="text-foreground">{umansPct.toFixed(0)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Est. token value ({days}d)</span>
+                <span className="text-foreground">{formatCost(hermesEstCost)}</span>
+              </div>
+            </div>
+            {hermesEstCost > UMANS_PLAN_COST && (
+              <div className="text-xs text-emerald-500 pt-1">
+                ✓ {((hermesEstCost / UMANS_PLAN_COST)).toFixed(0)}x value vs pay-per-token
+              </div>
+            )}
+          </div>
+
+          {/* OpenRouter */}
+          <div className="space-y-2 p-3 rounded-lg border border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-medium">OpenRouter</span>
+              </div>
+              <span className="text-lg font-bold">Pay/token</span>
+            </div>
+            <div className="text-xs space-y-1 text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Models</span>
+                <span className="text-foreground">300+ providers</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Balance</span>
+                <span className="text-foreground">${orBalance.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Spent all-time</span>
+                <span className="text-foreground">${orSpent.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Flexibility</span>
+                <span className="text-foreground">Any model, any time</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Rate limits</span>
+                <span className="text-foreground">None (pay-per-use)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Claude Code */}
+          <div className="space-y-2 p-3 rounded-lg border border-border/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-medium">Claude Code Pro</span>
+              </div>
+              <span className="text-lg font-bold">${CLAUDE_CODE_COST}<span className="text-xs text-muted-foreground">/mo</span></span>
+            </div>
+            <div className="text-xs space-y-1 text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Model</span>
+                <span className="text-foreground">Sonnet 4 / Opus 4</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Usage</span>
+                <span className="text-foreground">Capped (5hr windows)</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Visibility</span>
+                <span className="text-foreground">None in Hermes</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Best for</span>
+                <span className="text-foreground">Complex multi-file edits</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tracking</span>
+                <span className="text-foreground">No data available</span>
+              </div>
+            </div>
+            <div className="text-xs text-amber-500/70 pt-1">
+              Runs outside Hermes — no session data logged
+            </div>
+          </div>
+        </div>
+
+        {/* Total monthly spend */}
+        <div className="mt-4 pt-3 border-t border-border/30 flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Total monthly spend</span>
+          <span className="text-lg font-bold">
+            ${UMANS_PLAN_COST + CLAUDE_CODE_COST + orBalance > 0 ? UMANS_PLAN_COST + CLAUDE_CODE_COST : UMANS_PLAN_COST + CLAUDE_CODE_COST}
+            <span className="text-xs text-muted-foreground">/mo subscriptions</span>
+            {orSpent > 0 && (
+              <span className="text-sm text-muted-foreground"> + ${orSpent.toFixed(2)} pay-per-token</span>
+            )}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function CostPage() {
@@ -524,6 +851,7 @@ export default function CostPage() {
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [modelsData, setModelsData] = useState<ModelsAnalyticsResponse | null>(null);
   const [umansUsage, setUmansUsage] = useState<UsageLogEntry[]>([]);
+  const [orLog, setOrLog] = useState<OpenRouterLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { setAfterTitle, setEnd } = usePageHeader();
@@ -536,12 +864,14 @@ export default function CostPage() {
       api.getAnalytics(days).catch(() => null),
       api.getModelsAnalytics(days).catch(() => null),
       fetchUsageLog(),
+      fetchOpenRouterLog(),
     ])
-      .then(([pc, an, ma, uu]) => {
+      .then(([pc, an, ma, uu, or]) => {
         setProviderCosts(pc);
         setAnalytics(an);
         setModelsData(ma);
         setUmansUsage(uu);
+        setOrLog(or);
       })
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
@@ -723,6 +1053,27 @@ export default function CostPage() {
           <UmansUsageChart entries={umansUsage} />
         </CardContent>
       </Card>
+
+      {/* OpenRouter Spend Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-blue-400" />
+            OpenRouter Balance & Spend History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <OpenRouterSpendChart entries={orLog} />
+        </CardContent>
+      </Card>
+
+      {/* Subscription Value Comparison */}
+      <SubscriptionComparison
+        umansUsage={umansUsage}
+        orEntries={orLog}
+        analytics={analytics}
+        days={days}
+      />
 
       {/* Daily Cost Chart */}
       {analytics?.daily && analytics.daily.length > 0 && (
