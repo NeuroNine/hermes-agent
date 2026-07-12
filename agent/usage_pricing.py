@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -8,6 +9,8 @@ from typing import Any, Dict, Literal, Optional
 
 from agent.model_metadata import fetch_endpoint_model_metadata, fetch_model_metadata
 from utils import base_url_host_matches
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_PRICING = {"input": 0.0, "output": 0.0}
 
@@ -1270,6 +1273,32 @@ def estimate_usage_cost(
         amount += Decimal(usage.cache_write_tokens) * entry.cache_write_cost_per_million / _ONE_MILLION
     if entry.request_cost is not None and usage.request_count:
         amount += Decimal(usage.request_count) * entry.request_cost
+
+    # Sanity guard: reject absurd per-token rates that bypassed normalization.
+    # If a provider returns per-token pricing (e.g., 0.0000014) and the
+    # threshold fails to normalize it, the cost balloons by 1M×. A legitimate
+    # session cost for <100M tokens should never exceed $10,000. If it does,
+    # the pricing was almost certainly misinterpreted — return None rather
+    # than storing a seven-figure phantom cost on the dashboard.
+    total_tokens = (
+        usage.input_tokens + usage.output_tokens
+        + usage.cache_read_tokens + usage.cache_write_tokens
+        + usage.reasoning_tokens
+    )
+    if total_tokens > 0 and amount > Decimal("10000"):
+        # cost per 1K tokens > $10 is absurd (GPT-4 is ~$0.01-$0.03/1K)
+        logger.warning(
+            "Sanity guard: rejecting cost $%s for %s (%d tokens, %s/%s) — "
+            "likely per-token/per-million misinterpretation",
+            amount, model_name, total_tokens, entry.source, entry.pricing_version,
+        )
+        return CostResult(
+            amount_usd=None,
+            status="unknown",
+            source=entry.source,
+            label="n/a",
+            notes=("sanity guard: cost exceeds $10,000 for sub-100M token session",),
+        )
 
     status: CostStatus = "estimated"
     label = f"~${amount:.2f}"
