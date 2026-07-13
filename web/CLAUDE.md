@@ -166,13 +166,23 @@ A cron job (Usage Logger, ID `6dc2a34f082c`, 15-min interval) writes these entri
 ## Key Pages
 
 ### CostPage (`/cost`)
-Unified cost tracking. Four sections:
-1. **Summary Stats** — Estimated cost, monthly projection, umans usage, fixed subscriptions
-2. **Provider Balances** — Live Nous + OpenRouter balance cards from `/api/cost/providers`
-3. **umans Request Usage Chart** — JSONL monitor data, last 48 entries
-4. **Daily Cost Chart + Cost-by-Model Table** — From analytics endpoints, surfaces `estimated_cost`
+Token value tracking (redesigned 2026-07-12). Computes value client-side from
+actual token counts instead of trusting broken `estimated_cost_usd` in the DB.
+Sections:
+1. **Summary Stats** — Token Value (umans per-M rates), OR Equivalent (selectable
+   comparison model), umans request usage, fixed subscriptions
+2. **Comparison model selector** — Claude Sonnet 4 / DeepSeek V3 / GPT-4o
+3. **Provider Balances** — Live Nous + OpenRouter balance cards from `/api/cost/providers`
+4. **umans Request Usage Chart** — JSONL monitor data, last 48 entries
+5. **OpenRouter Spend Chart** — Balance + cumulative spend from JSONL log
+6. **Subscription Value** — umans vs OpenRouter vs Claude Code comparison with value ratio
+7. **Daily Token Value Chart** — Dual bars (umans rates vs OR equivalent) per day
+8. **Token Value by Model** — Per-model breakdown with umans value + OR equivalent
+9. **Token Summary** — Total tokens, sessions, cache read, reasoning tokens
 
 Constants: `UMANS_PLAN_COST = $20/mo`, `CLAUDE_CODE_COST = $20/mo`, `UMANS_CAP = 200`.
+Pricing rates: `UMANS_RATES` (per-model umans rates), `OR_COMPARISON_MODELS` (3 OR comparison models).
+All token value computed via `tokenValue(inputTokens, outputTokens, rates)` helper.
 
 ### ResearchPage (`/research`)
 Overnight research system dashboard. Reads umans usage JSONL, poller state files,
