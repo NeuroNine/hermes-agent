@@ -1,8 +1,18 @@
-# Hermes Agent Dashboard — Web Frontend
+# HELM Bridge — Web Frontend
 
 ## Project Overview
-React 19 + Vite 8 + Tailwind 4 dashboard for Hermes Agent. Served by Python backend
-on port 9119 behind Tailscale Serve HTTPS. The built output goes to `../hermes_cli/web_dist/`.
+React 19 + Vite 8 + Tailwind 4 dashboard for Hermes Agent, branded as "HELM Bridge"
+(the ship's AI persona). Served by Python backend on port 9119 behind Tailscale
+Serve HTTPS. The built output goes to `../hermes_cli/web_dist/`.
+
+## Branding
+
+The dashboard is branded "HELM Bridge" throughout (sidebar header, browser tab,
+mobile header, System page version label). The i18n brand strings (`brand` and
+`brandShort`) are set to "HELM Bridge" / "HELM" in all language files. The active
+theme is "helm" (HELM Bridge theme) in config.yaml. Internal references to the
+Hermes Agent *software* (update checks, version display, API method names like
+`checkHermesUpdate`) remain "Hermes" — that's the underlying platform name.
 
 ## Build Commands
 ```bash
@@ -33,10 +43,11 @@ systemctl --user restart hermes-dashboard.service
 
 ### Key Frontend Files
 
-- `src/App.tsx` (~1360 lines) — Main shell: sidebar nav, routing, layout.
-  - `BUILTIN_ROUTES_CORE` (line ~135): Route-to-component map. Add new routes here.
-  - `BUILTIN_NAV_REST` (line ~164): Array of nav items in sidebar display order.
-  - `SidebarNavLink` (line ~812): Renders each nav item. `end` prop for `/` and `/sessions`.
+- `src/App.tsx` (~1380 lines) — Main shell: sidebar nav, routing, layout.
+  - `BUILTIN_ROUTES_CORE` (line ~137): Route-to-component map. Add new routes here.
+  - `BUILTIN_NAV_REST` (line ~170): Array of nav items, each with a `section` field. Items are grouped and rendered by section.
+  - `NAV_SECTIONS` (line ~1326): Section ordering and labels (Bridge, Activity, Insights, System, Configuration).
+  - `SidebarNavLink` (line ~830): Renders each nav item. `end` prop for `/` and `/sessions`.
 - `src/index.css` — Global CSS: theme tokens, shadcn-compat color variables.
   - `@theme inline` block (~line 154): opacity tokens using `color-mix()`. Dark themes need 15-20% midground minimum for cards, 30%+ for borders, 75%+ for text-secondary.
 - `src/themes/presets.ts` — Built-in theme definitions (Hermes Teal, Midnight, Ember, Mono, Cyberpunk, Rosé, Nous Blue, HELM Bridge, Default-Large).

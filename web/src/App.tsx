@@ -123,6 +123,7 @@ const CHAT_NAV_ITEM: NavItem = {
   labelKey: "chat",
   label: "Chat",
   icon: Terminal,
+  section: "bridge",
 };
 
 /**
@@ -168,46 +169,59 @@ function ChatRouteSink() {
 }
 
 const BUILTIN_NAV_REST: NavItem[] = [
-  { path: "/", label: "Home", icon: LayoutDashboard },
+  // ── Bridge ──────────────────────────────────────────────
+  { path: "/", label: "Home", icon: LayoutDashboard, section: "bridge" },
+
+  // ── Activity ────────────────────────────────────────────
   {
     path: "/sessions",
     labelKey: "sessions",
     label: "Sessions",
     icon: MessageSquare,
+    section: "activity",
   },
-  { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock },
-  { path: "/system", label: "System", icon: Wrench },
-  { path: "/config", labelKey: "config", label: "Config", icon: Settings },
-  { path: "/skills", labelKey: "skills", label: "Skills", icon: Package },
-  { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText },
-  {
-    path: "/models",
-    labelKey: "models",
-    label: "Models",
-    icon: Cpu,
-  },
-  { path: "/files", label: "Files", icon: FolderOpen },
-  { path: "/channels", label: "Channels", icon: Radio },
-  { path: "/profiles", labelKey: "profiles", label: "Profiles", icon: Users },
+  { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock, section: "activity" },
+  { path: "/research", label: "Research", icon: Telescope, section: "activity" },
+  { path: "/brain", label: "Brain", icon: Brain, section: "activity" },
+
+  // ── Insights ────────────────────────────────────────────
   {
     path: "/analytics",
     labelKey: "analytics",
     label: "Analytics",
     icon: BarChart3,
+    section: "insights",
   },
-  { path: "/mcp", label: "MCP", icon: Plug },
-  { path: "/plugins", labelKey: "plugins", label: "Plugins", icon: Puzzle },
-  { path: "/webhooks", label: "Webhooks", icon: Webhook },
-  { path: "/pairing", label: "Pairing", icon: ShieldCheck },
-  { path: "/research", label: "Research", icon: Telescope },
-  { path: "/brain", label: "Brain", icon: Brain },
-  { path: "/cost", label: "Cost", icon: DollarSign },
-  { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
+  { path: "/cost", label: "Cost", icon: DollarSign, section: "insights" },
+  {
+    path: "/models",
+    labelKey: "models",
+    label: "Models",
+    icon: Cpu,
+    section: "insights",
+  },
+
+  // ── System ──────────────────────────────────────────────
+  { path: "/system", label: "System", icon: Wrench, section: "system" },
+  { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText, section: "system" },
+  { path: "/files", label: "Files", icon: FolderOpen, section: "system" },
+
+  // ── Configuration ──────────────────────────────────────
+  { path: "/config", labelKey: "config", label: "Config", icon: Settings, section: "config" },
+  { path: "/skills", labelKey: "skills", label: "Skills", icon: Package, section: "config" },
+  { path: "/channels", label: "Channels", icon: Radio, section: "config" },
+  { path: "/profiles", labelKey: "profiles", label: "Profiles", icon: Users, section: "config" },
+  { path: "/plugins", labelKey: "plugins", label: "Plugins", icon: Puzzle, section: "config" },
+  { path: "/mcp", label: "MCP", icon: Plug, section: "config" },
+  { path: "/webhooks", label: "Webhooks", icon: Webhook, section: "config" },
+  { path: "/pairing", label: "Pairing", icon: ShieldCheck, section: "config" },
+  { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound, section: "config" },
   {
     path: "/docs",
     labelKey: "documentation",
     label: "Documentation",
     icon: BookOpen,
+    section: "config",
   },
 ];
 
@@ -587,9 +601,9 @@ export default function App() {
                 <PluginSlot name="header-left" />
 
                 <Typography className="font-bold text-[1.125rem] leading-[0.95] tracking-[0.0525rem] text-midground uppercase">
-                  Hermes
+                  HELM
                   <br />
-                  Agent
+                  Bridge
                 </Typography>
               </div>
 
@@ -626,18 +640,42 @@ export default function App() {
               className="min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden border-t border-current/10 py-2"
               aria-label={t.app.navigation}
             >
-              <ul className="flex flex-col">
-                {sidebarNav.coreItems.map((item) => (
-                  <SidebarNavLink
-                    closeMobile={closeMobile}
-                    collapsed={isDesktopCollapsed}
-                    item={item}
-                    key={item.path}
-                    t={t}
-                    tooltipWarmRef={tooltipWarmRef}
-                  />
-                ))}
-              </ul>
+              {NAV_SECTIONS.map((section) => {
+                const sectionItems = sidebarNav.coreItems.filter(
+                  (item) => (item.section ?? "bridge") === section.id,
+                );
+                if (sectionItems.length === 0) return null;
+                return (
+                  <div
+                    key={section.id}
+                    className="flex flex-col"
+                    role="group"
+                    aria-label={section.label}
+                  >
+                    <span
+                      className={cn(
+                        "px-5 pt-2.5 pb-1",
+                        "font-sans text-display text-[0.65rem] tracking-[0.14em] uppercase text-text-tertiary/60",
+                        isDesktopCollapsed && "lg:hidden",
+                      )}
+                    >
+                      {section.label}
+                    </span>
+                    <ul className="flex flex-col">
+                      {sectionItems.map((item) => (
+                        <SidebarNavLink
+                          closeMobile={closeMobile}
+                          collapsed={isDesktopCollapsed}
+                          item={item}
+                          key={item.path}
+                          t={t}
+                          tooltipWarmRef={tooltipWarmRef}
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
 
               {sidebarNav.pluginItems.length > 0 && (
                 <div
@@ -1318,7 +1356,17 @@ interface NavItem {
   label: string;
   labelKey?: string;
   path: string;
+  section?: string;
 }
+
+/** Sidebar section ordering. Items without a section are hidden. */
+const NAV_SECTIONS: { id: string; label: string }[] = [
+  { id: "bridge", label: "Bridge" },
+  { id: "activity", label: "Activity" },
+  { id: "insights", label: "Insights" },
+  { id: "system", label: "System" },
+  { id: "config", label: "Configuration" },
+];
 
 interface SidebarIconWithTooltipProps {
   children: ReactNode;
