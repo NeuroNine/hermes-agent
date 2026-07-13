@@ -48,10 +48,10 @@ systemctl --user restart hermes-dashboard.service
 
 ### Pages
 
-21 pages: HomePage, ChatPage, SessionsPage, CronPage, SystemPage, ConfigPage,
+22 pages: HomePage, ChatPage, SessionsPage, CronPage, SystemPage, ConfigPage,
 SkillsPage, LogsPage, ModelsPage, FilesPage, ChannelsPage, ProfilesPage,
 ProfileBuilderPage, AnalyticsPage, McpPage, PluginsPage, WebhooksPage,
-PairingPage, ResearchPage, CostPage, EnvPage, DocsPage.
+PairingPage, ResearchPage, CostPage, BrainPage, EnvPage, DocsPage.
 
 Pattern: each page imports `api` from `@/lib/api`, fetches data in `useEffect`,
 uses `Card`/`CardContent` from `@nous-research/ui`, icons from `lucide-react`,
@@ -98,6 +98,9 @@ yourMethod: (param: number) =>
 | `api.getAnalytics(days)` | `/api/analytics/usage` | Daily + per-model token/cost analytics |
 | `api.getModelsAnalytics(days)` | `/api/analytics/models` | Per-model analytics with capabilities |
 | `api.getProviderCosts()` | `/api/cost/providers` | Live Nous + OpenRouter balance/usage |
+| `api.getBrainOverview()` | `/api/brain/overview` | Checkpoint/fact-store/flat-memory/poller/dreaming stats |
+| `api.getBrainCheckpoints(limit)` | `/api/brain/checkpoints` | Recent checkpoints with parsed facts + session title |
+| `api.getBrainFlatMemory()` | `/api/brain/flat-memory` | MEMORY.md + USER.md contents and capacity |
 | `api.getLogs({ file, lines, level })` | `/api/logs` | Log lines |
 | `api.checkHermesUpdate()` | `/api/update/check` | Version check |
 
@@ -163,6 +166,17 @@ Constants: `UMANS_PLAN_COST = $20/mo`, `CLAUDE_CODE_COST = $20/mo`, `UMANS_CAP =
 ### ResearchPage (`/research`)
 Overnight research system dashboard. Reads umans usage JSONL, poller state files,
 research briefings from `~/.hermes/research/`, and cron job status for known research job IDs.
+
+### BrainPage (`/brain`)
+HELM's memory-systems dashboard. Four sections:
+1. **Overview cards** — checkpoint count/cost, fact store size/trust, L1 MEMORY.md + USER.md capacity bars
+2. **Recent Checkpoints** — latest 5, expandable to show parsed `facts_json` (entities, decisions, preferences, file states, unresolved threads)
+3. **Poller + Dreaming status** — last/next run, poller run stats (sessions seen, checkpointed, errors), cron job IDs `a8e522dcd30b` (poller) and `2b96e49478b0` (dreaming)
+4. **Flat memory contents** — collapsible MEMORY.md/USER.md entries, split on lines containing a lone `§` separator
+
+Backend reads `~/.hermes/checkpoints/index.db` (checkpoints/cursors tables), `~/.hermes/memory_store.db`
+(facts table), `~/.hermes/memories/{MEMORY,USER}.md`, and `~/.hermes/logs/checkpoint-poller.jsonl` directly
+via read-only sqlite3 connections — see `_brain_open_index_db()` / `_get_brain_overview_sync()` in `web_server.py`.
 
 ### AnalyticsPage (`/analytics`)
 Token analytics gated on `dashboard.show_token_analytics` config flag. Shows daily token

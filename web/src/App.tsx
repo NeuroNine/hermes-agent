@@ -22,6 +22,7 @@ import {
   Activity,
   BarChart3,
   BookOpen,
+  Brain,
   Clock,
   Code,
   Cpu,
@@ -95,6 +96,7 @@ import WebhooksPage from "@/pages/WebhooksPage";
 import SystemPage from "@/pages/SystemPage";
 import ResearchPage from "@/pages/ResearchPage";
 import CostPage from "@/pages/CostPage";
+import BrainPage from "@/pages/BrainPage";
 import HomePage from "@/pages/HomePage";
 import ChatPage from "@/pages/ChatPage";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -148,6 +150,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/webhooks": WebhooksPage,
   "/system": SystemPage,
   "/research": ResearchPage,
+  "/brain": BrainPage,
   "/cost": CostPage,
   "/profiles": ProfilesPage,
   "/profiles/new": ProfileBuilderPage,
@@ -197,6 +200,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/webhooks", label: "Webhooks", icon: Webhook },
   { path: "/pairing", label: "Pairing", icon: ShieldCheck },
   { path: "/research", label: "Research", icon: Telescope },
+  { path: "/brain", label: "Brain", icon: Brain },
   { path: "/cost", label: "Cost", icon: DollarSign },
   { path: "/env", labelKey: "keys", label: "Keys", icon: KeyRound },
   {

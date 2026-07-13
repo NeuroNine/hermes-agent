@@ -16341,6 +16341,227 @@ async def get_provider_costs():
 
 
 # ---------------------------------------------------------------------------
+# Brain page — checkpoints, fact store, flat memory, poller/dreaming status
+# ---------------------------------------------------------------------------
+
+_BRAIN_POLLER_CRON_ID = "a8e522dcd30b"
+_BRAIN_DREAMING_CRON_ID = "2b96e49478b0"
+_BRAIN_CHECKPOINT_EST_COST_USD = 0.0015
+
+
+def _brain_cron_job_status(job_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        jobs = _list_cron_jobs_sync("all")
+    except Exception:
+        _log.exception("Brain: failed to list cron jobs for %s", job_id)
+        return None
+    for job in jobs:
+        if job.get("id") == job_id:
+            return {
+                "id": job.get("id"),
+                "name": job.get("name"),
+                "enabled": job.get("enabled"),
+                "state": job.get("state"),
+                "last_run_at": job.get("last_run_at"),
+                "next_run_at": job.get("next_run_at"),
+                "last_status": job.get("last_status"),
+                "last_error": job.get("last_error"),
+            }
+    return None
+
+
+def _brain_open_index_db():
+    """Open ``checkpoints/index.db`` read-only, or ``None`` if not yet created."""
+    import sqlite3
+
+    path = get_hermes_home() / "checkpoints" / "index.db"
+    if not path.exists():
+        return None
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _brain_read_flat_memory_file(name: str, limit: int) -> Dict[str, Any]:
+    path = get_hermes_home() / "memories" / name
+    try:
+        content = path.read_text(encoding="utf-8")
+    except Exception:
+        content = ""
+    return {"content": content, "chars": len(content), "limit": limit}
+
+
+def _get_brain_overview_sync() -> Dict[str, Any]:
+    from datetime import datetime
+
+    now = datetime.now().astimezone()
+
+    checkpoints = {"total": 0, "today": 0, "last_7d": 0, "est_cost_usd": 0.0}
+    conn = _brain_open_index_db()
+    if conn is not None:
+        try:
+            rows = conn.execute("SELECT created_at FROM checkpoints").fetchall()
+        finally:
+            conn.close()
+        today_count = 0
+        last7_count = 0
+        for row in rows:
+            try:
+                dt = datetime.fromisoformat(row["created_at"])
+            except (TypeError, ValueError):
+                continue
+            if dt.date() == now.date():
+                today_count += 1
+            if (now - dt).total_seconds() < 7 * 86400:
+                last7_count += 1
+        checkpoints = {
+            "total": len(rows),
+            "today": today_count,
+            "last_7d": last7_count,
+            "est_cost_usd": round(len(rows) * _BRAIN_CHECKPOINT_EST_COST_USD, 4),
+        }
+
+    fact_store = {"total_facts": 0, "avg_trust": 0.0}
+    fs_path = get_hermes_home() / "memory_store.db"
+    if fs_path.exists():
+        import sqlite3
+
+        fconn = sqlite3.connect(f"file:{fs_path}?mode=ro", uri=True)
+        fconn.row_factory = sqlite3.Row
+        try:
+            row = fconn.execute(
+                "SELECT COUNT(*) AS c, COALESCE(AVG(trust_score), 0) AS t FROM facts"
+            ).fetchone()
+            fact_store = {"total_facts": row["c"], "avg_trust": round(row["t"], 3)}
+        finally:
+            fconn.close()
+
+    memory_info = _brain_read_flat_memory_file("MEMORY.md", 2200)
+    user_info = _brain_read_flat_memory_file("USER.md", 1375)
+    flat_memory = {
+        "memory_chars": memory_info["chars"],
+        "memory_limit": memory_info["limit"],
+        "user_chars": user_info["chars"],
+        "user_limit": user_info["limit"],
+    }
+
+    poller_log_path = get_hermes_home() / "logs" / "checkpoint-poller.jsonl"
+    last_stats: Optional[Dict[str, Any]] = None
+    if poller_log_path.exists():
+        try:
+            lines = [
+                line
+                for line in poller_log_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            if lines:
+                last_stats = json.loads(lines[-1])
+        except Exception:
+            _log.exception("Brain: failed to read checkpoint-poller.jsonl")
+
+    poller_job = _brain_cron_job_status(_BRAIN_POLLER_CRON_ID)
+    dreaming_job = _brain_cron_job_status(_BRAIN_DREAMING_CRON_ID)
+
+    poller = {
+        "last_run": (last_stats or {}).get("ts") or (poller_job or {}).get("last_run_at"),
+        "next_run": (poller_job or {}).get("next_run_at"),
+        "last_stats": last_stats,
+        "job": poller_job,
+    }
+    dreaming_has_run = bool(dreaming_job and dreaming_job.get("last_run_at"))
+    dreaming = {
+        "last_run": (dreaming_job or {}).get("last_run_at"),
+        "next_run": (dreaming_job or {}).get("next_run_at"),
+        "status": (dreaming_job or {}).get("last_status")
+        or ("ok" if dreaming_has_run else "never_run"),
+        "job": dreaming_job,
+    }
+
+    return {
+        "checkpoints": checkpoints,
+        "fact_store": fact_store,
+        "flat_memory": flat_memory,
+        "poller": poller,
+        "dreaming": dreaming,
+    }
+
+
+@app.get("/api/brain/overview")
+async def get_brain_overview():
+    from starlette.concurrency import run_in_threadpool
+
+    return await run_in_threadpool(_get_brain_overview_sync)
+
+
+def _get_brain_checkpoints_sync(limit: int) -> Dict[str, Any]:
+    conn = _brain_open_index_db()
+    if conn is None:
+        return {"checkpoints": []}
+    try:
+        rows = conn.execute(
+            "SELECT id, root_id, created_at, trigger, summary, facts_json "
+            "FROM checkpoints ORDER BY id DESC LIMIT ?",
+            (max(1, min(limit, 200)),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    root_ids = sorted({row["root_id"] for row in rows if row["root_id"]})
+    titles: Dict[str, Optional[str]] = {}
+    if root_ids:
+        db = _open_session_db_for_profile(None)
+        try:
+            placeholders = ",".join("?" for _ in root_ids)
+            cur = db._conn.execute(
+                f"SELECT id, title FROM sessions WHERE id IN ({placeholders})",
+                root_ids,
+            )
+            titles = {row["id"]: row["title"] for row in cur.fetchall()}
+        finally:
+            db.close()
+
+    checkpoints = []
+    for row in rows:
+        facts = None
+        if row["facts_json"]:
+            try:
+                facts = json.loads(row["facts_json"])
+            except Exception:
+                facts = None
+        checkpoints.append({
+            "id": row["id"],
+            "root_id": row["root_id"],
+            "created_at": row["created_at"],
+            "trigger": row["trigger"],
+            "summary": row["summary"],
+            "facts": facts,
+            "session_title": titles.get(row["root_id"]),
+        })
+    return {"checkpoints": checkpoints}
+
+
+@app.get("/api/brain/checkpoints")
+async def get_brain_checkpoints(limit: int = 20):
+    from starlette.concurrency import run_in_threadpool
+
+    return await run_in_threadpool(_get_brain_checkpoints_sync, limit)
+
+
+def _get_brain_flat_memory_sync() -> Dict[str, Any]:
+    return {
+        "memory": _brain_read_flat_memory_file("MEMORY.md", 2200),
+        "user": _brain_read_flat_memory_file("USER.md", 1375),
+    }
+
+
+@app.get("/api/brain/flat-memory")
+async def get_brain_flat_memory():
+    from starlette.concurrency import run_in_threadpool
+
+    return await run_in_threadpool(_get_brain_flat_memory_sync)
+
+
+# ---------------------------------------------------------------------------
 # /api/pty — PTY-over-WebSocket bridge for the dashboard "Chat" tab.
 #
 # The endpoint spawns the same ``hermes --tui`` binary the CLI uses, behind

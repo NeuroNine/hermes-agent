@@ -471,6 +471,12 @@ export const api = {
     ),
   getProviderCosts: () =>
     fetchJSON<ProviderCostResponse>(`/api/cost/providers`),
+  getBrainOverview: () =>
+    fetchJSON<BrainOverviewResponse>(`/api/brain/overview`),
+  getBrainCheckpoints: (limit = 20) =>
+    fetchJSON<BrainCheckpointsResponse>(`/api/brain/checkpoints?limit=${limit}`),
+  getBrainFlatMemory: () =>
+    fetchJSON<BrainFlatMemoryResponse>(`/api/brain/flat-memory`),
   getModelsAnalytics: (days: number, profile = getManagementProfile()) =>
     fetchJSON<ModelsAnalyticsResponse>(
       appendProfileParam(`/api/analytics/models?days=${days}`, profile),
@@ -2141,6 +2147,93 @@ export interface ProviderCostEntry {
 
 export interface ProviderCostResponse {
   providers: ProviderCostEntry[];
+}
+
+export interface BrainCronJobStatus {
+  id: string;
+  name?: string | null;
+  enabled?: boolean;
+  state?: string | null;
+  last_run_at?: string | null;
+  next_run_at?: string | null;
+  last_status?: string | null;
+  last_error?: string | null;
+}
+
+export interface BrainPollerStats {
+  ts: string;
+  dry_run?: boolean;
+  duration_s?: number;
+  sessions_seen?: number;
+  checkpointed?: number;
+  skipped_idle?: number;
+  skipped_no_new?: number;
+  errors?: number;
+}
+
+export interface BrainOverviewResponse {
+  checkpoints: {
+    total: number;
+    today: number;
+    last_7d: number;
+    est_cost_usd: number;
+  };
+  fact_store: {
+    total_facts: number;
+    avg_trust: number;
+  };
+  flat_memory: {
+    memory_chars: number;
+    memory_limit: number;
+    user_chars: number;
+    user_limit: number;
+  };
+  poller: {
+    last_run: string | null;
+    next_run: string | null;
+    last_stats: BrainPollerStats | null;
+    job: BrainCronJobStatus | null;
+  };
+  dreaming: {
+    last_run: string | null;
+    next_run: string | null;
+    status: string;
+    job: BrainCronJobStatus | null;
+  };
+}
+
+export interface BrainCheckpointFacts {
+  entities?: { name: string; type: string; detail: string }[];
+  decisions?: string[];
+  progress_markers?: string[];
+  file_states?: { path: string; state: string }[];
+  preferences?: string[];
+  unresolved_threads?: string[];
+}
+
+export interface BrainCheckpoint {
+  id: number;
+  root_id: string;
+  created_at: string;
+  trigger: string;
+  summary: string;
+  facts: BrainCheckpointFacts | null;
+  session_title: string | null;
+}
+
+export interface BrainCheckpointsResponse {
+  checkpoints: BrainCheckpoint[];
+}
+
+export interface BrainFlatMemoryEntry {
+  content: string;
+  chars: number;
+  limit: number;
+}
+
+export interface BrainFlatMemoryResponse {
+  memory: BrainFlatMemoryEntry;
+  user: BrainFlatMemoryEntry;
 }
 
 export interface CronJobRepeat {
