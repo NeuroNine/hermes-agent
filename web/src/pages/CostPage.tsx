@@ -810,7 +810,7 @@ function SubscriptionComparison({
               </div>
               <div className="flex justify-between">
                 <span>Visibility</span>
-                <span className="text-foreground">None in Hermes</span>
+                <span className="text-foreground">None in HELM</span>
               </div>
               <div className="flex justify-between">
                 <span>Best for</span>
