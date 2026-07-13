@@ -677,6 +677,7 @@ def cronjob(
     workdir: Optional[str] = None,
     no_agent: Optional[bool] = None,
     attach_to_session: Optional[bool] = None,
+    allow_memory: Optional[bool] = None,
     task_id: str = None,
 ) -> str:
     """Unified cron job management tool."""
@@ -750,6 +751,7 @@ def cronjob(
                 workdir=_normalize_optional_job_value(workdir),
                 no_agent=_no_agent,
                 attach_to_session=attach_to_session,
+                allow_memory=bool(allow_memory),
             )
             _notify_provider_jobs_changed_safe()
             _create_message = f"Cron job '{job['name']}' created."
@@ -923,6 +925,8 @@ def cronjob(
                 updates["enabled_toolsets"] = enabled_toolsets or None
             if attach_to_session is not None:
                 updates["attach_to_session"] = bool(attach_to_session)
+            if allow_memory is not None:
+                updates["allow_memory"] = bool(allow_memory)
             if workdir is not None:
                 # Empty string clears the field (restores old behaviour);
                 # otherwise pass raw — update_job() validates / normalizes.
@@ -1085,6 +1089,10 @@ Important safety rule: cron-run sessions should not recursively schedule more cr
                 "type": "boolean",
                 "description": "When True, this job becomes CONTINUABLE: the user can reply to its delivery and the agent has the brief in context instead of asking 'what is that?'. On thread-capable platforms (Telegram topics, Discord/Slack threads) a dedicated thread is opened for the job and its replies; on DM-only platforms (WhatsApp/Signal) the brief is mirrored into the origin DM session. Use this for conversational recurring jobs the user will reply to — daily briefings, reminders that kick off follow-up work. Leave unset for fire-and-forget alerts/watchdogs. Overrides the global cron.mirror_delivery config for this one job. Only the origin chat is touched (never fan-out targets); no effect when deliver='local'."
             },
+            "allow_memory": {
+                "type": "boolean",
+                "description": "Default: False. When True, the cron job's agent gets full memory provider access (fact_store, fact_feedback, flat memory tool) despite being a cron context. By default cron jobs run with skip_memory=True to prevent cron system prompts from corrupting user representations. Set allow_memory=True ONLY for memory maintenance jobs (e.g. dreaming/consolidation sessions) that need to read/write the structured memory store. Requires \"memory\" in enabled_toolsets."
+            },
         },
         "required": ["action"]
     }
@@ -1140,6 +1148,8 @@ registry.register(
         enabled_toolsets=args.get("enabled_toolsets"),
         workdir=args.get("workdir"),
         no_agent=args.get("no_agent"),
+        attach_to_session=args.get("attach_to_session"),
+        allow_memory=args.get("allow_memory"),
         task_id=kw.get("task_id"),
     ))(),
     check_fn=check_cronjob_requirements,
