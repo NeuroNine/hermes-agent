@@ -16499,7 +16499,7 @@ def _get_brain_checkpoints_sync(limit: int) -> Dict[str, Any]:
         return {"checkpoints": []}
     try:
         rows = conn.execute(
-            "SELECT id, root_id, created_at, trigger, summary, facts_json "
+            "SELECT id, root_id, created_at, conversation_at, trigger, summary, facts_json "
             "FROM checkpoints ORDER BY id DESC LIMIT ?",
             (max(1, min(limit, 200)),),
         ).fetchall()
@@ -16532,6 +16532,7 @@ def _get_brain_checkpoints_sync(limit: int) -> Dict[str, Any]:
             "id": row["id"],
             "root_id": row["root_id"],
             "created_at": row["created_at"],
+            "conversation_at": row["conversation_at"],
             "trigger": row["trigger"],
             "summary": row["summary"],
             "facts": facts,

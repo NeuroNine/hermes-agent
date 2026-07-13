@@ -3364,7 +3364,11 @@ def run_job(
             # Without a workdir, keep cwd context discovery disabled.
             skip_context_files=not bool(_job_workdir),
             load_soul_identity=True,
-            skip_memory=True,  # Cron system prompts would corrupt user representations
+            # Cron jobs default to skip_memory=True (cron system prompts would
+            # corrupt user representations), but a job can opt in via
+            # allow_memory=True — needed for memory maintenance jobs like the
+            # dreaming session that must access fact_store/memory tools.
+            skip_memory=not job.get("allow_memory", False),
             platform="cron",
             session_id=_cron_session_id,
             session_db=_session_db,
