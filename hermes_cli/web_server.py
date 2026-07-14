@@ -16436,8 +16436,8 @@ def _get_brain_overview_sync() -> Dict[str, Any]:
         finally:
             fconn.close()
 
-    memory_info = _brain_read_flat_memory_file("MEMORY.md", 2200)
-    user_info = _brain_read_flat_memory_file("USER.md", 1375)
+    memory_info = _brain_read_flat_memory_file("MEMORY.md", 4000)
+    user_info = _brain_read_flat_memory_file("USER.md", 2000)
     flat_memory = {
         "memory_chars": memory_info["chars"],
         "memory_limit": memory_info["limit"],
@@ -16550,8 +16550,8 @@ async def get_brain_checkpoints(limit: int = 20):
 
 def _get_brain_flat_memory_sync() -> Dict[str, Any]:
     return {
-        "memory": _brain_read_flat_memory_file("MEMORY.md", 2200),
-        "user": _brain_read_flat_memory_file("USER.md", 1375),
+        "memory": _brain_read_flat_memory_file("MEMORY.md", 4000),
+        "user": _brain_read_flat_memory_file("USER.md", 2000),
     }
 
 

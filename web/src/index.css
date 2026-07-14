@@ -86,6 +86,15 @@
      these as `--series-input-token` / `--series-output-token`. */
   --series-input-token: #ffe6cb;
   --series-output-token: #34d399;
+
+  /* Component-style defaults. Themes that define `componentStyles` override
+     these via inline styles on :root (ThemeProvider sets them). Themes that
+     don't (most built-ins) fall back to the solid background color so the
+     sidebar and header are never accidentally transparent — the `background`
+     shorthand's initial value is `transparent`, which would make text
+     unreadable when overlaid on page content (e.g. the mobile drawer). */
+  --component-sidebar-background: var(--background-base);
+  --component-header-background: var(--background-base);
 }
 
 /* Theme tokens cascade into the document root so every descendant inherits
