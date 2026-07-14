@@ -16689,6 +16689,91 @@ async def resolve_ai_health_entry(entry_id: str):
 
 
 # ---------------------------------------------------------------------------
+# /api/tangents — parked side-thoughts worth revisiting
+# ---------------------------------------------------------------------------
+
+_TANGENTS_LOG_PATH = os.path.expanduser("~/.hermes/logs/tangents.jsonl")
+
+
+def _read_jsonl(path: str) -> list:
+    if not os.path.exists(path):
+        return []
+    entries = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except Exception:
+                    pass
+    except Exception:
+        return []
+    entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+    return entries
+
+
+@app.get("/api/tangents")
+async def get_tangents(limit: int = 200, status: str = "all", category: str = ""):
+    from starlette.concurrency import run_in_threadpool
+    return await run_in_threadpool(_get_tangents_sync, limit, status, category)
+
+
+def _get_tangents_sync(limit: int, status: str, category: str) -> dict:
+    entries = _read_jsonl(_TANGENTS_LOG_PATH)
+    filtered = [e for e in entries if (status == "all" or e.get("status") == status) and (not category or e.get("category") == category)][:limit]
+    parked = sum(1 for e in entries if e.get("status") == "parked")
+    promoted = sum(1 for e in entries if e.get("status") == "promoted")
+    researched = sum(1 for e in entries if e.get("status") == "researched")
+    by_cat, by_pri = {}, {}
+    for e in entries:
+        c = e.get("category", "curiosity")
+        by_cat[c] = by_cat.get(c, 0) + 1
+        p = e.get("priority", "medium")
+        by_pri[p] = by_pri.get(p, 0) + 1
+    return {"entries": filtered, "summary": {"total": len(entries), "parked": parked, "promoted": promoted, "researched": researched, "by_category": by_cat, "by_priority": by_pri}}
+
+
+@app.post("/api/tangents/{entry_id}/update")
+async def update_tangent(entry_id: str, status: str = "promoted"):
+    from starlette.concurrency import run_in_threadpool
+    return await run_in_threadpool(_update_tangent_sync, entry_id, status)
+
+
+def _update_tangent_sync(entry_id: str, new_status: str) -> dict:
+    path = _TANGENTS_LOG_PATH
+    if not os.path.exists(path):
+        return {"ok": False, "error": "Log file not found"}
+    lines, found = [], False
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("timestamp") == entry_id:
+                        entry["status"] = new_status
+                        from datetime import datetime, timezone as _tz
+                        entry[new_status + "_at"] = datetime.now(_tz.utc).isoformat()
+                        found = True
+                    lines.append(json.dumps(entry))
+                except Exception:
+                    lines.append(line)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    if not found:
+        return {"ok": False, "error": "Entry not found"}
+    with open(path, "w", encoding="utf-8") as f:
+        for l in lines:
+            f.write(l + "\n")
+    return {"ok": True, "updated": entry_id, "status": new_status}
+
+
+# ---------------------------------------------------------------------------
 # /api/pty — PTY-over-WebSocket bridge for the dashboard "Chat" tab.
 #
 # The endpoint spawns the same ``hermes --tui`` binary the CLI uses, behind
