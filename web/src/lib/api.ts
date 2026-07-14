@@ -477,6 +477,12 @@ export const api = {
     fetchJSON<BrainCheckpointsResponse>(`/api/brain/checkpoints?limit=${limit}`),
   getBrainFlatMemory: () =>
     fetchJSON<BrainFlatMemoryResponse>(`/api/brain/flat-memory`),
+  getAiHealth: (limit = 200, status = "all") =>
+    fetchJSON<AiHealthResponse>(`/api/ai-health?limit=${limit}&status=${status}`),
+  resolveAiHealthEntry: (entryId: string) =>
+    fetchJSON<AiHealthResolveResponse>(`/api/ai-health/${entryId}/resolve`, {
+      method: "POST",
+    }),
   getModelsAnalytics: (days: number, profile = getManagementProfile()) =>
     fetchJSON<ModelsAnalyticsResponse>(
       appendProfileParam(`/api/analytics/models?days=${days}`, profile),
@@ -2234,6 +2240,37 @@ export interface BrainFlatMemoryEntry {
 export interface BrainFlatMemoryResponse {
   memory: BrainFlatMemoryEntry;
   user: BrainFlatMemoryEntry;
+}
+
+// ── AI Health Log ──────────────────────────────────────────────────────
+
+export interface AiHealthEntry {
+  timestamp: string;
+  tool: string;
+  severity: "info" | "warning" | "error";
+  description: string;
+  context: string;
+  status: "open" | "resolved";
+  resolved_at?: string;
+}
+
+export interface AiHealthSummary {
+  total: number;
+  open: number;
+  resolved: number;
+  by_severity: Record<string, number>;
+  by_tool: Record<string, number>;
+}
+
+export interface AiHealthResponse {
+  entries: AiHealthEntry[];
+  summary: AiHealthSummary;
+}
+
+export interface AiHealthResolveResponse {
+  ok: boolean;
+  resolved?: string;
+  error?: string;
 }
 
 export interface CronJobRepeat {

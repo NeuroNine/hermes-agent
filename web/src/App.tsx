@@ -34,6 +34,7 @@ import {
   FileText,
   Globe,
   Heart,
+  HeartPulse,
   KeyRound,
   LayoutDashboard,
   Menu,
@@ -97,6 +98,7 @@ import SystemPage from "@/pages/SystemPage";
 import ResearchPage from "@/pages/ResearchPage";
 import CostPage from "@/pages/CostPage";
 import BrainPage from "@/pages/BrainPage";
+import AiHealthPage from "@/pages/AiHealthPage";
 import HomePage from "@/pages/HomePage";
 import ChatPage from "@/pages/ChatPage";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -153,6 +155,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/research": ResearchPage,
   "/brain": BrainPage,
   "/cost": CostPage,
+  "/ai-health": AiHealthPage,
   "/profiles": ProfilesPage,
   "/profiles/new": ProfileBuilderPage,
   "/config": ConfigPage,
@@ -203,6 +206,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
 
   // ── System ──────────────────────────────────────────────
   { path: "/system", label: "System", icon: Wrench, section: "system" },
+  { path: "/ai-health", label: "AI Health", icon: HeartPulse, section: "system" },
   { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText, section: "system" },
   { path: "/files", label: "Files", icon: FolderOpen, section: "system" },
 

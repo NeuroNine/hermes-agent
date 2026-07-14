@@ -16563,6 +16563,132 @@ async def get_brain_flat_memory():
 
 
 # ---------------------------------------------------------------------------
+# /api/ai-health — AI tool/availability issue log.
+#
+# Reads from ~/.hermes/logs/ai-health.jsonl — a JSONL file that HELM appends
+# to whenever a tool is unavailable, broken, or behaving unexpectedly during
+# normal operation.  The weekly health check cron job reviews these entries.
+# ---------------------------------------------------------------------------
+
+_AI_HEALTH_LOG_PATH = os.path.expanduser("~/.hermes/logs/ai-health.jsonl")
+
+
+def _read_ai_health_log_sync(limit: int = 200, status: str = "") -> Dict[str, Any]:
+    """Read and parse the AI health JSONL log."""
+    path = _AI_HEALTH_LOG_PATH
+    if not os.path.exists(path):
+        return {"entries": [], "summary": {"total": 0, "open": 0, "resolved": 0, "by_severity": {}, "by_tool": {}}}
+
+    entries: list = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except Exception:
+                    pass
+    except Exception:
+        return {"entries": [], "summary": {"total": 0, "open": 0, "resolved": 0, "by_severity": {}, "by_tool": {}}}
+
+    # Filter by status if requested
+    if status and status != "all":
+        entries = [e for e in entries if e.get("status") == status]
+
+    # Sort by timestamp descending (newest first)
+    entries.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+
+    # Build summary from ALL entries (not filtered)
+    all_entries = entries if not status or status == "all" else []
+    # Re-read for full summary if filtered
+    if status and status != "all":
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                all_lines = [json.loads(l.strip()) for l in f if l.strip()]
+        except Exception:
+            all_lines = []
+    else:
+        all_lines = list(entries)
+
+    open_count = sum(1 for e in all_lines if e.get("status") == "open")
+    resolved_count = sum(1 for e in all_lines if e.get("status") == "resolved")
+    by_severity: Dict[str, int] = {}
+    by_tool: Dict[str, int] = {}
+    for e in all_lines:
+        sev = e.get("severity", "info")
+        by_severity[sev] = by_severity.get(sev, 0) + 1
+        tool = e.get("tool", "unknown")
+        by_tool[tool] = by_tool.get(tool, 0) + 1
+
+    summary = {
+        "total": len(all_lines),
+        "open": open_count,
+        "resolved": resolved_count,
+        "by_severity": by_severity,
+        "by_tool": by_tool,
+    }
+
+    # Apply limit
+    entries = entries[:limit]
+
+    return {"entries": entries, "summary": summary}
+
+
+@app.get("/api/ai-health")
+async def get_ai_health(limit: int = 200, status: str = "all"):
+    from starlette.concurrency import run_in_threadpool
+
+    return await run_in_threadpool(_read_ai_health_log_sync, limit, status)
+
+
+def _resolve_ai_health_entry_sync(entry_id: str) -> Dict[str, Any]:
+    """Mark a health log entry as resolved by its timestamp (used as ID)."""
+    path = _AI_HEALTH_LOG_PATH
+    if not os.path.exists(path):
+        return {"ok": False, "error": "Log file not found"}
+
+    # Read all lines, find and update the matching entry, rewrite
+    lines: list = []
+    found = False
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("timestamp") == entry_id:
+                        entry["status"] = "resolved"
+                        entry["resolved_at"] = datetime.now(timezone.utc).isoformat()
+                        found = True
+                    lines.append(json.dumps(entry))
+                except Exception:
+                    lines.append(line)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    if not found:
+        return {"ok": False, "error": "Entry not found"}
+
+    # Write back
+    with open(path, "w", encoding="utf-8") as f:
+        for l in lines:
+            f.write(l + "\n")
+
+    return {"ok": True, "resolved": entry_id}
+
+
+@app.post("/api/ai-health/{entry_id}/resolve")
+async def resolve_ai_health_entry(entry_id: str):
+    from starlette.concurrency import run_in_threadpool
+
+    return await run_in_threadpool(_resolve_ai_health_entry_sync, entry_id)
+
+
+# ---------------------------------------------------------------------------
 # /api/pty — PTY-over-WebSocket bridge for the dashboard "Chat" tab.
 #
 # The endpoint spawns the same ``hermes --tui`` binary the CLI uses, behind
