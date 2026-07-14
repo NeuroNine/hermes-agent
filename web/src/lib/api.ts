@@ -480,9 +480,17 @@ export const api = {
   getAiHealth: (limit = 200, status = "all") =>
     fetchJSON<AiHealthResponse>(`/api/ai-health?limit=${limit}&status=${status}`),
   resolveAiHealthEntry: (entryId: string) =>
-    fetchJSON<AiHealthResolveResponse>(`/api/ai-health/${entryId}/resolve`, {
-      method: "POST",
-    }),
+    fetchJSON<{ ok: boolean }>(`/api/ai-health/${entryId}/resolve`, { method: "POST" }),
+  // Tangents Log
+  getTangents: (limit = 200, status = "all", category = "") => {
+    const qs = new URLSearchParams();
+    qs.set("limit", String(limit));
+    qs.set("status", status);
+    if (category) qs.set("category", category);
+    return fetchJSON<TangentsResponse>(`/api/tangents?${qs.toString()}`);
+  },
+  updateTangent: (entryId: string, status: string) =>
+    fetchJSON<{ ok: boolean }>(`/api/tangents/${entryId}/update?status=${status}`, { method: "POST" }),
   getModelsAnalytics: (days: number, profile = getManagementProfile()) =>
     fetchJSON<ModelsAnalyticsResponse>(
       appendProfileParam(`/api/analytics/models?days=${days}`, profile),
@@ -2271,6 +2279,33 @@ export interface AiHealthResolveResponse {
   ok: boolean;
   resolved?: string;
   error?: string;
+}
+
+// ── Tangents Log ───────────────────────────────────────────────────────
+
+export interface TangentEntry {
+  timestamp: string;
+  source: string;
+  tangent: string;
+  category: string;
+  priority: "low" | "medium" | "high";
+  status: "parked" | "promoted" | "researched";
+  promoted_at?: string;
+  researched_at?: string;
+}
+
+export interface TangentsSummary {
+  total: number;
+  parked: number;
+  promoted: number;
+  researched: number;
+  by_category: Record<string, number>;
+  by_priority: Record<string, number>;
+}
+
+export interface TangentsResponse {
+  entries: TangentEntry[];
+  summary: TangentsSummary;
 }
 
 export interface CronJobRepeat {
