@@ -62,7 +62,7 @@ systemctl --user restart hermes-dashboard.service
 22 pages: HomePage, ChatPage, SessionsPage, CronPage, SystemPage, ConfigPage,
 SkillsPage, LogsPage, ModelsPage, FilesPage, ChannelsPage, ProfilesPage,
 ProfileBuilderPage, AnalyticsPage, McpPage, PluginsPage, WebhooksPage,
-PairingPage, ResearchPage, CostPage, BrainPage, EnvPage, DocsPage.
+PairingPage, ResearchPage, CostPage, BrainPage, AiHealthPage, EnvPage, DocsPage.
 
 Pattern: each page imports `api` from `@/lib/api`, fetches data in `useEffect`,
 uses `Card`/`CardContent` from `@nous-research/ui`, icons from `lucide-react`,
@@ -112,6 +112,8 @@ yourMethod: (param: number) =>
 | `api.getBrainOverview()` | `/api/brain/overview` | Checkpoint/fact-store/flat-memory/poller/dreaming stats |
 | `api.getBrainCheckpoints(limit)` | `/api/brain/checkpoints` | Recent checkpoints with parsed facts + session title |
 | `api.getBrainFlatMemory()` | `/api/brain/flat-memory` | MEMORY.md + USER.md contents and capacity |
+| `api.getAiHealth(limit, status)` | `/api/ai-health` | AI tool/availability issue log entries + summary |
+| `api.resolveAiHealthEntry(id)` | `POST /api/ai-health/{id}/resolve` | Mark a health log entry as resolved |
 | `api.getLogs({ file, lines, level })` | `/api/logs` | Log lines |
 | `api.checkHermesUpdate()` | `/api/update/check` | Version check |
 
