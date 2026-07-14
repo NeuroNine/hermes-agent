@@ -25,6 +25,7 @@ import {
   Brain,
   Clock,
   Code,
+  Compass,
   Cpu,
   Database,
   DollarSign,
@@ -99,6 +100,7 @@ import ResearchPage from "@/pages/ResearchPage";
 import CostPage from "@/pages/CostPage";
 import BrainPage from "@/pages/BrainPage";
 import AiHealthPage from "@/pages/AiHealthPage";
+import TangentsPage from "@/pages/TangentsPage";
 import HomePage from "@/pages/HomePage";
 import ChatPage from "@/pages/ChatPage";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -156,6 +158,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/brain": BrainPage,
   "/cost": CostPage,
   "/ai-health": AiHealthPage,
+  "/tangents": TangentsPage,
   "/profiles": ProfilesPage,
   "/profiles/new": ProfileBuilderPage,
   "/config": ConfigPage,
@@ -207,6 +210,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
   // ── System ──────────────────────────────────────────────
   { path: "/system", label: "System", icon: Wrench, section: "system" },
   { path: "/ai-health", label: "AI Health", icon: HeartPulse, section: "system" },
+  { path: "/tangents", label: "Tangents", icon: Compass, section: "system" },
   { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText, section: "system" },
   { path: "/files", label: "Files", icon: FolderOpen, section: "system" },
 
