@@ -31,8 +31,9 @@ import {
   DollarSign,
   Download,
   Eye,
-  FolderOpen,
+  Feather,
   FileText,
+  FolderOpen,
   Globe,
   Heart,
   HeartPulse,
@@ -96,12 +97,6 @@ import PairingPage from "@/pages/PairingPage";
 import ChannelsPage from "@/pages/ChannelsPage";
 import WebhooksPage from "@/pages/WebhooksPage";
 import SystemPage from "@/pages/SystemPage";
-import ResearchPage from "@/pages/ResearchPage";
-import CostPage from "@/pages/CostPage";
-import BrainPage from "@/pages/BrainPage";
-import AiHealthPage from "@/pages/AiHealthPage";
-import TangentsPage from "@/pages/TangentsPage";
-import HomePage from "@/pages/HomePage";
 import ChatPage from "@/pages/ChatPage";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
@@ -140,7 +135,6 @@ const CHAT_NAV_ITEM: NavItem = {
  * and nav highlight keep working.
  */
 const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
-  "/": HomePage,
   "/sessions": SessionsPage,
   "/files": FilesPage,
   "/analytics": AnalyticsPage,
@@ -154,11 +148,6 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/channels": ChannelsPage,
   "/webhooks": WebhooksPage,
   "/system": SystemPage,
-  "/research": ResearchPage,
-  "/brain": BrainPage,
-  "/cost": CostPage,
-  "/ai-health": AiHealthPage,
-  "/tangents": TangentsPage,
   "/profiles": ProfilesPage,
   "/profiles/new": ProfileBuilderPage,
   "/config": ConfigPage,
@@ -187,8 +176,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
     section: "activity",
   },
   { path: "/cron", labelKey: "cron", label: "Cron", icon: Clock, section: "activity" },
-  { path: "/research", label: "Research", icon: Telescope, section: "activity" },
-  { path: "/brain", label: "Brain", icon: Brain, section: "activity" },
+  // Research, Brain, Reflections — provided by plugins (helm-research, helm-brain, helm-reflections)
 
   // ── Insights ────────────────────────────────────────────
   {
@@ -198,7 +186,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
     icon: BarChart3,
     section: "insights",
   },
-  { path: "/cost", label: "Cost", icon: DollarSign, section: "insights" },
+  // Cost — provided by plugin (helm-cost)
   {
     path: "/models",
     labelKey: "models",
@@ -209,8 +197,7 @@ const BUILTIN_NAV_REST: NavItem[] = [
 
   // ── System ──────────────────────────────────────────────
   { path: "/system", label: "System", icon: Wrench, section: "system" },
-  { path: "/ai-health", label: "AI Health", icon: HeartPulse, section: "system" },
-  { path: "/tangents", label: "Tangents", icon: Compass, section: "system" },
+  // AI Health, Tangents — provided by plugins (helm-ai-health, helm-tangents)
   { path: "/logs", labelKey: "logs", label: "Logs", icon: FileText, section: "system" },
   { path: "/files", label: "Files", icon: FolderOpen, section: "system" },
 
@@ -236,27 +223,34 @@ const BUILTIN_NAV_REST: NavItem[] = [
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Activity,
   BarChart3,
+  Brain,
   Clock,
+  Compass,
   Cpu,
+  DollarSign,
   FileText,
+  Feather,
   FolderOpen,
+  Globe,
+  Heart,
+  HeartPulse,
   KeyRound,
+  LayoutDashboard,
   MessageSquare,
   Package,
   Settings,
   Puzzle,
   Sparkles,
+  Star,
+  Telescope,
   Terminal,
-  Globe,
-  Database,
-  Shield,
   Users,
   Wrench,
   Zap,
-  Heart,
-  Star,
   Code,
   Eye,
+  Shield,
+  Database,
 };
 
 function resolveIcon(name: string): ComponentType<{ className?: string }> {
@@ -277,6 +271,7 @@ function buildNavItems(
       path: manifest.tab.path,
       label: manifest.label,
       icon: resolveIcon(manifest.icon),
+      section: manifest.tab.section,
     };
 
     const pos = manifest.tab.position ?? "end";
@@ -298,7 +293,9 @@ function buildNavItems(
   return items;
 }
 
-/** Split merged nav into built-in sidebar entries vs plugin tabs, preserving plugin order hints. */
+/** Split merged nav into built-in sidebar entries vs plugin tabs, preserving plugin order hints.
+ * Plugin items with a `section` field go into coreItems (rendered in sectioned nav).
+ * Plugin items without a section go into pluginItems (rendered in the Plugins section). */
 function partitionSidebarNav(
   builtIn: NavItem[],
   manifests: PluginManifest[],
@@ -308,8 +305,11 @@ function partitionSidebarNav(
   const coreItems: NavItem[] = [];
   const pluginItems: NavItem[] = [];
   for (const item of merged) {
-    if (builtinPaths.has(item.path)) coreItems.push(item);
-    else pluginItems.push(item);
+    if (builtinPaths.has(item.path) || item.section) {
+      coreItems.push(item);
+    } else {
+      pluginItems.push(item);
+    }
   }
   return { coreItems, pluginItems };
 }
@@ -338,6 +338,18 @@ function buildRoutes(
     path: string;
     element: ReactNode;
   }> = [];
+
+  // Add routes for override plugins whose target path isn't in built-in routes
+  // (e.g. helm-home overrides "/" but "/" was removed from built-in routes)
+  for (const [overridePath, m] of byOverride) {
+    if (!builtinRoutes[overridePath]) {
+      routes.push({
+        key: `override:${m.name}`,
+        path: overridePath,
+        element: <PluginPage name={m.name} />,
+      });
+    }
+  }
 
   for (const [path, Component] of Object.entries(builtinRoutes)) {
     const om = byOverride.get(path);

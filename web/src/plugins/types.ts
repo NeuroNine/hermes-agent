@@ -16,6 +16,8 @@ export interface PluginManifest {
     override?: string;
     /** When true, the plugin may register without a sidebar tab (slot-only, etc.). */
     hidden?: boolean;
+    /** Sidebar section to render in (e.g. "activity", "insights", "system"). If unset, goes to the Plugins section. */
+    section?: string;
   };
   /** Declared for discovery; actual slots use registerSlot in the plugin bundle. */
   slots?: string[];

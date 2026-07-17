@@ -19001,6 +19001,9 @@ def _discover_dashboard_plugins() -> list:
                     tab_info["override"] = override_path
                 if bool(raw_tab.get("hidden")):
                     tab_info["hidden"] = True
+                raw_section = raw_tab.get("section")
+                if isinstance(raw_section, str) and raw_section:
+                    tab_info["section"] = raw_section
                 # Slots: list of named slot locations this plugin populates.
                 # The frontend exposes ``registerSlot(pluginName, slotName, Component)``
                 # on window; plugins with non-empty slots call it from their JS bundle.
