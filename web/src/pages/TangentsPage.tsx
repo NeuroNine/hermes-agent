@@ -9,8 +9,7 @@ import {
   Sparkles,
   Tag,
 } from "lucide-react";
-import { api } from "@/lib/api";
-import type { TangentEntry, TangentsResponse } from "@/lib/api";
+import { fetchJSON } from "@/lib/api";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
@@ -32,7 +31,7 @@ function priColor(p: string) { return p === "high" ? "text-destructive" : p === 
 function priTone(p: string): "destructive" | "warning" | "secondary" { return p === "high" ? "destructive" : p === "medium" ? "warning" : "secondary"; }
 function statusTone(s: string): "outline" | "success" | "warning" { return s === "parked" ? "outline" : s === "promoted" ? "warning" : s === "researched" ? "success" : "outline"; }
 
-function TangentRow({ entry, onPromote }: { entry: TangentEntry; onPromote: (t: string) => void }) {
+function TangentRow({ entry, onPromote }: { entry: any; onPromote: (t: string) => void }) {
   const [updating, setUpdating] = useState(false);
   const catLabel = CATEGORY_LABELS[entry.category] || entry.category;
   return (
@@ -63,7 +62,7 @@ function TangentRow({ entry, onPromote }: { entry: TangentEntry; onPromote: (t: 
 }
 
 export default function TangentsPage() {
-  const [data, setData] = useState<TangentsResponse | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [catFilter, setCatFilter] = useState<string>("all");
@@ -72,7 +71,7 @@ export default function TangentsPage() {
 
   const load = useCallback(() => {
     setLoading(true); setError(null);
-    api.getTangents(200, statusFilter, catFilter === "all" ? "" : catFilter).then(setData).catch((e) => setError(String(e))).finally(() => setLoading(false));
+    fetchJSON<any>("/api/plugins/helm-tangents?limit=200&status=" + statusFilter + (catFilter !== "all" ? "&category=" + catFilter : "")).then(setData).catch((e) => setError(String(e))).finally(() => setLoading(false));
   }, [statusFilter, catFilter]);
 
   useEffect(() => { load(); }, [load]);
@@ -82,11 +81,11 @@ export default function TangentsPage() {
     return () => { setAfterTitle(null); setEnd(null); };
   }, [loading, load, setAfterTitle, setEnd]);
 
-  const handlePromote = useCallback((ts: string) => { api.updateTangent(ts, "promoted").then(() => load()).catch((e) => setError(String(e))); }, [load]);
+  const handlePromote = useCallback((ts: string) => { fetchJSON<any>("/api/plugins/helm-tangents/" + ts + "/update?status=promoted", { method: "POST" }).then(() => load()).catch((e) => setError(String(e))); }, [load]);
   const s = data?.summary;
   const entries = data?.entries ?? [];
 
-  const cats = useMemo(() => { if (!s?.by_category) return []; return Object.entries(s.by_category).sort((a, b) => b[1] - a[1]); }, [s]);
+  const cats = useMemo(() => { if (!s?.by_category) return []; return Object.entries(s.by_category as Record<string, number>).sort((a, b) => b[1] - a[1]); }, [s]);
 
   return (
     <div className="space-y-4 p-4 lg:p-6 max-w-7xl mx-auto">
@@ -112,7 +111,7 @@ export default function TangentsPage() {
         <CardHeader><div className="flex items-center gap-2"><Compass className="h-5 w-5 text-muted-foreground" /><CardTitle className="text-base">Tangents Log</CardTitle><span className="text-xs text-muted-foreground ml-auto">{entries.length} {entries.length === 1 ? "entry" : "entries"}</span></div></CardHeader>
         <CardContent className="space-y-2">
           {error && <div className="flex items-center gap-2 text-xs text-destructive"><Sparkles className="h-4 w-4" />{error}</div>}
-          {entries.length === 0 ? <div className="flex flex-col items-center justify-center py-8 gap-2"><Compass className="h-8 w-8 text-muted-foreground/40" /><p className="text-sm text-muted-foreground">{loading ? "Loading..." : "No tangents parked. All focus — nothing drifted."}</p></div> : entries.map((e) => <TangentRow key={e.timestamp} entry={e} onPromote={handlePromote} />)}
+          {entries.length === 0 ? <div className="flex flex-col items-center justify-center py-8 gap-2"><Compass className="h-8 w-8 text-muted-foreground/40" /><p className="text-sm text-muted-foreground">{loading ? "Loading..." : "No tangents parked. All focus — nothing drifted."}</p></div> : entries.map((e: any) => <TangentRow key={e.timestamp} entry={e} onPromote={handlePromote} />)}
         </CardContent>
       </Card>
     </div>

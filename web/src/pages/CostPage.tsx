@@ -12,12 +12,10 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { api } from "@//lib/api";
+import { api, fetchJSON } from "@//lib/api";
 import type {
   AnalyticsResponse,
   ModelsAnalyticsResponse,
-  ProviderCostResponse,
-  ProviderCostEntry,
 } from "@//lib/api";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
@@ -27,7 +25,7 @@ import { cn } from "@//lib/utils";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const MONITOR_DIR = "/home/neuronine/.hermes/scripts/.umans-monitor";
+const MONITOR_DIR = "/home/neuronine/.hermes/scripts/.openrouter-monitor";
 const UMANS_CAP = 200;
 const UMANS_PLAN_COST = 20; // $20/mo Pro
 const CLAUDE_CODE_COST = 20; // $20/mo Claude Code Pro
@@ -193,7 +191,7 @@ async function fetchOpenRouterLog(): Promise<OpenRouterLogEntry[]> {
 
 // ── Provider Balance Card ─────────────────────────────────────────────────
 
-function ProviderCard({ entry }: { entry: ProviderCostEntry }) {
+function ProviderCard({ entry }: { entry: any }) {
   const isNous = entry.provider === "nous";
   const isOR = entry.provider === "openrouter";
   const accent = isNous ? "text-primary" : isOR ? "text-blue-400" : "text-muted-foreground";
@@ -225,7 +223,7 @@ function ProviderCard({ entry }: { entry: ProviderCostEntry }) {
         ) : (
           <>
             {/* Usage windows (gauge bars) */}
-            {entry.windows?.map((w, i) => (
+            {entry.windows?.map((w: any, i: any) => (
               <div key={i} className="space-y-1">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{w.label}</span>
@@ -262,14 +260,14 @@ function ProviderCard({ entry }: { entry: ProviderCostEntry }) {
             ))}
 
             {/* Balance lines for Nous credits */}
-            {entry.balance_lines?.map((line, i) => (
+            {entry.balance_lines?.map((line: any, i: any) => (
               <div key={`bl-${i}`} className="text-muted-foreground">
                 {line}
               </div>
             ))}
 
             {/* Details for OpenRouter */}
-            {entry.details?.map((detail, i) => (
+            {entry.details?.map((detail: any, i: any) => (
               <div key={`d-${i}`} className="text-muted-foreground">
                 {detail}
               </div>
@@ -327,7 +325,7 @@ function UmansUsageChart({ entries }: { entries: UsageLogEntry[] }) {
   if (data.points.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-6 text-center">
-        No umans usage data. The usage logger cron job may not be running.
+        No OpenRouter balance history is available yet. The cost logger may not have run.
       </div>
     );
   }
@@ -935,7 +933,7 @@ function SortHeader({ label, col, sortKey, sortDir, toggle, className }: {
 
 export default function CostPage() {
   const [days, setDays] = useState(7);
-  const [providerCosts, setProviderCosts] = useState<ProviderCostResponse | null>(null);
+  const [providerCosts, setProviderCosts] = useState<any | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [modelsData, setModelsData] = useState<ModelsAnalyticsResponse | null>(null);
   const [umansUsage, setUmansUsage] = useState<UsageLogEntry[]>([]);
@@ -951,7 +949,7 @@ export default function CostPage() {
     setLoading(true);
     setError(null);
     Promise.all([
-      api.getProviderCosts().catch(() => null),
+      fetchJSON<any>("/api/plugins/helm-cost/providers").catch(() => null),
       api.getAnalytics(days).catch(() => null),
       api.getModelsAnalytics(days).catch(() => null),
       fetchUsageLog(),
@@ -975,7 +973,7 @@ export default function CostPage() {
   // Auto-refresh provider balances every 60s
   useEffect(() => {
     const interval = setInterval(() => {
-      api.getProviderCosts().then(setProviderCosts).catch(() => {});
+      fetchJSON<any>("/api/plugins/helm-cost/providers").then(setProviderCosts).catch(() => {});
     }, 60_000);
     return () => clearInterval(interval);
   }, []);
@@ -1167,7 +1165,7 @@ export default function CostPage() {
           Provider Balances
         </h2>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {providerCosts?.providers.map((p) => (
+          {providerCosts?.providers.map((p: any) => (
             <ProviderCard key={p.provider} entry={p} />
           )) ?? (
             <Card className="col-span-full">

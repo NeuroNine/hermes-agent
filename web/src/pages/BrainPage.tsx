@@ -13,12 +13,7 @@ import {
   Sparkles,
   UserCircle,
 } from "lucide-react";
-import { api } from "@/lib/api";
-import type {
-  BrainCheckpoint,
-  BrainOverviewResponse,
-  BrainFlatMemoryResponse,
-} from "@/lib/api";
+import { fetchJSON } from "@/lib/api";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
@@ -107,7 +102,7 @@ function CapacityBar({ used, limit }: { used: number; limit: number }) {
 
 // ── Checkpoint Row (expandable) ─────────────────────────────────────────
 
-function CheckpointRow({ checkpoint }: { checkpoint: BrainCheckpoint }) {
+function CheckpointRow({ checkpoint }: { checkpoint: any }) {
   const [expanded, setExpanded] = useState(false);
   const facts = checkpoint.facts;
   const factCount = facts
@@ -157,7 +152,7 @@ function CheckpointRow({ checkpoint }: { checkpoint: BrainCheckpoint }) {
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Entities</div>
               <ul className="space-y-0.5">
-                {facts.entities.map((e, i) => (
+                {facts.entities.map((e: any, i: any) => (
                   <li key={i}>
                     <span className="font-medium">{e.name}</span>
                     {e.type && <span className="text-muted-foreground"> ({e.type})</span>}
@@ -171,7 +166,7 @@ function CheckpointRow({ checkpoint }: { checkpoint: BrainCheckpoint }) {
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Decisions</div>
               <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                {facts.decisions.map((d, i) => (
+                {facts.decisions.map((d: any, i: any) => (
                   <li key={i}>{d}</li>
                 ))}
               </ul>
@@ -181,7 +176,7 @@ function CheckpointRow({ checkpoint }: { checkpoint: BrainCheckpoint }) {
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Preferences</div>
               <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                {facts.preferences.map((p, i) => (
+                {facts.preferences.map((p: any, i: any) => (
                   <li key={i}>{p}</li>
                 ))}
               </ul>
@@ -191,7 +186,7 @@ function CheckpointRow({ checkpoint }: { checkpoint: BrainCheckpoint }) {
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">File States</div>
               <ul className="space-y-0.5">
-                {facts.file_states.map((f, i) => (
+                {facts.file_states.map((f: any, i: any) => (
                   <li key={i}>
                     <span className="font-mono text-[11px]">{f.path}</span>
                     <span className="text-muted-foreground"> — {f.state}</span>
@@ -204,7 +199,7 @@ function CheckpointRow({ checkpoint }: { checkpoint: BrainCheckpoint }) {
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Unresolved Threads</div>
               <ul className="list-disc list-inside space-y-0.5 text-amber-500/90">
-                {facts.unresolved_threads.map((u, i) => (
+                {facts.unresolved_threads.map((u: any, i: any) => (
                   <li key={i}>{u}</li>
                 ))}
               </ul>
@@ -214,7 +209,7 @@ function CheckpointRow({ checkpoint }: { checkpoint: BrainCheckpoint }) {
             <div>
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Progress Markers</div>
               <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                {facts.progress_markers.map((p, i) => (
+                {facts.progress_markers.map((p: any, i: any) => (
                   <li key={i}>{p}</li>
                 ))}
               </ul>
@@ -283,7 +278,7 @@ function FlatMemoryCard({
 
 // ── Poller / Dreaming Status Card ────────────────────────────────────────
 
-function PollerStatusCard({ overview }: { overview: BrainOverviewResponse | null }) {
+function PollerStatusCard({ overview }: { overview: any }) {
   const poller = overview?.poller;
   const stats = poller?.last_stats;
   const hasErrors = (stats?.errors ?? 0) > 0;
@@ -339,7 +334,7 @@ function PollerStatusCard({ overview }: { overview: BrainOverviewResponse | null
   );
 }
 
-function DreamingStatusCard({ overview }: { overview: BrainOverviewResponse | null }) {
+function DreamingStatusCard({ overview }: { overview: any }) {
   const dreaming = overview?.dreaming;
   const status = dreaming?.status ?? "never_run";
   const tone = status === "ok" ? "success" : status === "never_run" ? "outline" : "warning";
@@ -373,9 +368,9 @@ function DreamingStatusCard({ overview }: { overview: BrainOverviewResponse | nu
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function BrainPage() {
-  const [overview, setOverview] = useState<BrainOverviewResponse | null>(null);
-  const [checkpoints, setCheckpoints] = useState<BrainCheckpoint[]>([]);
-  const [flatMemory, setFlatMemory] = useState<BrainFlatMemoryResponse | null>(null);
+  const [overview, setOverview] = useState<any>(null);
+  const [checkpoints, setCheckpoints] = useState<any[]>([]);
+  const [flatMemory, setFlatMemory] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { setAfterTitle, setEnd } = usePageHeader();
@@ -384,9 +379,9 @@ export default function BrainPage() {
     setLoading(true);
     setError(null);
     Promise.all([
-      api.getBrainOverview(),
-      api.getBrainCheckpoints(RECENT_CHECKPOINTS_SHOWN),
-      api.getBrainFlatMemory(),
+      fetchJSON<any>("/api/plugins/helm-brain/overview"),
+      fetchJSON<any>("/api/plugins/helm-brain/checkpoints?limit=" + RECENT_CHECKPOINTS_SHOWN),
+      fetchJSON<any>("/api/plugins/helm-brain/flat-memory"),
     ])
       .then(([ov, cp, fm]) => {
         setOverview(ov);

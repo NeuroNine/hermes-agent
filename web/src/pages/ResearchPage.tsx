@@ -71,7 +71,7 @@ interface PollerState {
 }
 
 const RESEARCH_DIR = "/home/neuronine/.hermes/research";
-const MONITOR_DIR = "/home/neuronine/.hermes/scripts/.umans-monitor";
+const MONITOR_DIR = "/home/neuronine/.hermes/scripts/.openrouter-monitor";
 
 // Known research system cron job IDs (from SKILL.md)
 const RESEARCH_CRON_IDS = [

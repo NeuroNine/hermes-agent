@@ -10,8 +10,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { api } from "@/lib/api";
-import type { AiHealthEntry, AiHealthResponse } from "@/lib/api";
+import { fetchJSON } from "@/lib/api";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
@@ -87,7 +86,7 @@ function HealthEntryRow({
   entry,
   onResolve,
 }: {
-  entry: AiHealthEntry;
+  entry: any;
   onResolve: (timestamp: string) => void;
 }) {
   const [resolving, setResolving] = useState(false);
@@ -188,7 +187,7 @@ function StatCard({
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function AiHealthPage() {
-  const [data, setData] = useState<AiHealthResponse | null>(null);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved">("all");
@@ -197,8 +196,7 @@ export default function AiHealthPage() {
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    api
-      .getAiHealth(200, statusFilter)
+    fetchJSON<any>("/api/plugins/helm-ai-health?limit=200&status=" + statusFilter)
       .then(setData)
       .catch((err) => setError(String(err)))
       .finally(() => setLoading(false));
@@ -231,8 +229,7 @@ export default function AiHealthPage() {
 
   const handleResolve = useCallback(
     (timestamp: string) => {
-      api
-        .resolveAiHealthEntry(timestamp)
+      fetchJSON<any>("/api/plugins/helm-ai-health/" + timestamp + "/resolve", { method: "POST" })
         .then(() => load())
         .catch((err) => setError(String(err)));
     },
@@ -248,8 +245,8 @@ export default function AiHealthPage() {
   // Top affected tools
   const topTools = useMemo(() => {
     if (!summary?.by_tool) return [];
-    return Object.entries(summary.by_tool)
-      .sort((a, b) => b[1] - a[1])
+    return Object.entries(summary.by_tool as Record<string, number>)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5);
   }, [summary]);
 
@@ -354,7 +351,7 @@ export default function AiHealthPage() {
               </p>
             </div>
           ) : (
-            entries.map((entry) => (
+            entries.map((entry: any) => (
               <HealthEntryRow key={entry.timestamp} entry={entry} onResolve={handleResolve} />
             ))
           )}
