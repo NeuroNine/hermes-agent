@@ -11145,6 +11145,9 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
         if canonical == "subgoal":
             return await self._handle_subgoal_command(event)
 
+        if canonical == "todos":
+            return await self._handle_todos_command(event)
+
         if canonical == "voice":
             return await self._handle_voice_command(event)
 
@@ -13978,6 +13981,54 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
 
 
 
+
+    async def _handle_todos_command(self, event: MessageEvent) -> str:
+        """Handle /todos in the gateway — manage the durable action queue."""
+        from tools.action_queue import (
+            list_items, update_status, list_formatted, format_item_short,
+        )
+
+        args = event.get_command_args().strip()
+        parts = args.split()
+        sub = parts[0].lower() if parts else ""
+
+        if not sub or sub == "list":
+            lines = list_formatted(limit=20)
+            if not lines or lines[0].startswith("(no items"):
+                return "📋 Queue is empty."
+            return "📋 **Action Queue:**\n" + "\n".join(lines)
+
+        if sub == "commander":
+            lines = list_formatted(lane="commander", limit=20)
+            if not lines or lines[0].startswith("(no items"):
+                return "📋 No commander items."
+            return "📋 **Commander Queue:**\n" + "\n".join(lines)
+
+        if sub == "helm":
+            lines = list_formatted(lane="helm_proposal", limit=20)
+            if not lines or lines[0].startswith("(no items"):
+                return "📋 No HELM proposals."
+            return "📋 **HELM Proposals:**\n" + "\n".join(lines)
+
+        status_map = {
+            "done": "done",
+            "dismiss": "dismissed",
+            "approve": "approved",
+            "reject": "rejected",
+            "discuss": "discussing",
+        }
+        if sub in status_map:
+            if len(parts) < 2:
+                return f"Usage: /todos {sub} <id>"
+            item_id = parts[1]
+            result = update_status(item_id, status_map[sub])
+            if result is None:
+                return f"❌ Item not found: {item_id}"
+            title = result.get("title", "?")
+            status_str = sub.capitalize()
+            return f"✅ {status_str}d: **{title}** (`{item_id}`)"
+
+        return f"Unknown subcommand: {sub}. Try: commander, helm, done, dismiss, approve, reject, discuss"
 
     async def _handle_suggestions_command(self, event: MessageEvent) -> str:
         """Handle /suggestions in the gateway.

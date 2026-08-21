@@ -5225,6 +5225,68 @@ class TelegramAdapter(BasePlatformAdapter):
             logger.warning("[%s] send_clarify failed: %s", self.name, _redact_telegram_error_text(e))
             return SendResult(success=False, error=_redact_telegram_error_text(e))
 
+    async def send_helm_proposal(
+        self,
+        chat_id: str,
+        item_id: str,
+        title: str,
+        detail: str = "",
+        rationale: str = "",
+        risk: str = "",
+        session_key: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> SendResult:
+        """Send a HELM proposal with Yes/No/Discuss inline buttons.
+
+        Does NOT execute any changes — approval is purely recorded in the
+        persistent action queue.  A later worker can act on approved items.
+        """
+        if not self._bot:
+            return SendResult(success=False, error="Not connected")
+
+        try:
+            text = f"🤖 *HELM Proposal:* {_html.escape(title)}"
+            if detail:
+                text += f"\n\n*Detail:* {_html.escape(detail)}"
+            if rationale:
+                text += f"\n\n*Rationale:* {_html.escape(rationale)}"
+            if risk:
+                text += f"\n\n*Risk:* {_html.escape(risk)}"
+
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Yes", callback_data=f"hp:yes:{item_id}"),
+                    InlineKeyboardButton("❌ No", callback_data=f"hp:no:{item_id}"),
+                    InlineKeyboardButton("💬 Discuss", callback_data=f"hp:discuss:{item_id}"),
+                ],
+            ])
+
+            thread_id = self._metadata_thread_id(metadata)
+            kwargs: Dict[str, Any] = {
+                "chat_id": normalize_telegram_chat_id(chat_id),
+                "text": text,
+                "parse_mode": ParseMode.HTML,
+                "reply_markup": keyboard,
+                **self._link_preview_kwargs(),
+            }
+            reply_to_id = self._reply_to_message_id_for_send(None, metadata, reply_to_mode=self._reply_to_mode)
+            kwargs["reply_to_message_id"] = reply_to_id
+            kwargs.update(
+                self._thread_kwargs_for_send(
+                    chat_id,
+                    thread_id,
+                    metadata,
+                    reply_to_message_id=reply_to_id,
+                    reply_to_mode=self._reply_to_mode
+                )
+            )
+
+            msg = await self._send_message_with_thread_fallback(**kwargs)
+            return SendResult(success=True, message_id=str(msg.message_id))
+        except Exception as e:
+            logger.warning("[%s] send_helm_proposal failed: %s", self.name, _redact_telegram_error_text(e))
+            return SendResult(success=False, error=_redact_telegram_error_text(e))
+
     async def send_model_picker(
         self,
         chat_id: str,
@@ -6234,6 +6296,72 @@ class TelegramAdapter(BasePlatformAdapter):
                         "Telegram clarify button: resolve_gateway_clarify returned False (id=%s)",
                         clarify_id,
                     )
+            return
+
+        # --- HELM Proposal callbacks (hp:action:item_id) ---
+        # action ∈ {yes, no, discuss}
+        if data.startswith("hp:"):
+            parts = data.split(":", 2)
+            if len(parts) == 3:
+                action = parts[1]  # yes, no, discuss
+                item_id = parts[2]
+
+                caller_id = str(getattr(query.from_user, "id", ""))
+                if not self._is_callback_user_authorized(
+                    caller_id,
+                    chat_id=query_chat_id,
+                    chat_type=str(query_chat_type) if query_chat_type is not None else None,
+                    thread_id=str(query_thread_id) if query_thread_id is not None else None,
+                    user_name=query_user_name,
+                ):
+                    await query.answer(text="⛔ You are not authorized to act on proposals.")
+                    return
+
+                user_display = getattr(query.from_user, "first_name", "User")
+
+                action_map = {
+                    "yes": "approved",
+                    "no": "rejected",
+                    "discuss": "discussing",
+                }
+                status_str_map = {
+                    "yes": "✅ Approved",
+                    "no": "❌ Rejected",
+                    "discuss": "💬 Marked for discussion",
+                }
+                new_status = action_map.get(action)
+                if new_status:
+                    try:
+                        from tools.action_queue import update_status, get
+                        item = get(item_id)
+                        if item is None:
+                            await query.answer(text="❌ Proposal not found.")
+                            return
+                        result = update_status(item_id, new_status)
+                        if result is not None:
+                            label = status_str_map.get(action, "Resolved")
+                            await query.answer(text=f"{label} by {user_display}")
+                            try:
+                                await query.edit_message_text(
+                                    text=self.format_message(
+                                        f"{label} by {user_display}\n\n"
+                                        f"*{_html.escape(item.get('title', ''))}*\n\n"
+                                        f"⚡ Approval recorded. Implementation may be launched by a later worker."
+                                    ),
+                                    parse_mode=ParseMode.MARKDOWN_V2,
+                                    reply_markup=None,
+                                )
+                            except Exception:
+                                pass
+                            logger.info(
+                                "Telegram HELM proposal %s: %s (action=%s, user=%s)",
+                                item_id, action, new_status, user_display,
+                            )
+                        else:
+                            await query.answer(text="⚠️ Could not update proposal status.")
+                    except Exception as exc:
+                        logger.error("HELM proposal callback failed: %s", exc, exc_info=True)
+                        await query.answer(text="⚠️ Error processing action.")
             return
 
         # --- Update prompt callbacks ---

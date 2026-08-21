@@ -1536,6 +1536,59 @@ class CLICommandsMixin:
         if output:
             print(output)
 
+    def _handle_todos_command(self, cmd: str):
+        """Handle /todos — manage the durable two-lane action queue."""
+        from tools.action_queue import (
+            list_items, update_status, list_formatted,
+        )
+
+        rest = cmd.strip()
+        if rest.startswith("/"):
+            rest = rest.lstrip("/")
+        if rest.startswith("todos"):
+            rest = rest[len("todos"):].lstrip()
+        parts = rest.split()
+        sub = parts[0].lower() if parts else ""
+
+        if not sub or sub == "list":
+            lines = list_formatted(limit=50)
+            for line in lines:
+                print(f"  {line}")
+            return
+
+        if sub == "commander":
+            lines = list_formatted(lane="commander", limit=50)
+            for line in lines:
+                print(f"  {line}")
+            return
+
+        if sub == "helm":
+            lines = list_formatted(lane="helm_proposal", limit=50)
+            for line in lines:
+                print(f"  {line}")
+            return
+
+        if sub in ("done", "dismiss", "approve", "reject", "discuss"):
+            status_map = {
+                "done": "done",
+                "dismiss": "dismissed",
+                "approve": "approved",
+                "reject": "rejected",
+                "discuss": "discussing",
+            }
+            if len(parts) < 2:
+                print(f"(._.) Usage: /todos {sub} <id>")
+                return
+            item_id = parts[1]
+            result = update_status(item_id, status_map[sub])
+            if result is None:
+                print(f"(._.) Item not found: {item_id}")
+            else:
+                print(f"  ✓ {sub.capitalize()}d: {result.get('title', '?')} ({item_id})")
+            return
+
+        print(f"(._.) Unknown subcommand: {sub}. Try: commander, helm, done, dismiss, approve, reject, discuss")
+
     def _handle_skills_command(self, cmd: str):
         """Handle /skills slash command — delegates to hermes_cli.skills_hub."""
         from cli import ChatConsole

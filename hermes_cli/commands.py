@@ -223,6 +223,9 @@ COMMAND_REGISTRY: list[CommandDef] = [
                "Tools & Skills", cli_only=True),
 
     # Info
+    CommandDef("todos", "Manage the durable action queue", "Session",
+               args_hint="[commander|helm|done <id>|dismiss <id>|approve <id>|reject <id>|discuss <id>]",
+               subcommands=("commander", "helm", "done", "dismiss", "approve", "reject", "discuss")),
     CommandDef("commands", "Browse all commands and skills (paginated)", "Info",
                gateway_only=True, args_hint="[page]"),
     CommandDef("help", "Show available commands", "Info"),

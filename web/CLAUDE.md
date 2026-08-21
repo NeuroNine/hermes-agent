@@ -159,7 +159,7 @@ Backend calls `agent/account_usage.py`:
 
 ### umans Usage Monitor
 The Research and Cost pages read umans request usage from a JSONL log at
-`~/.hermes/scripts/.umans-monitor/usage-log.jsonl`. Each line:
+`~/.hermes/scripts/.openrouter-monitor/usage-log.jsonl`. Each line:
 ```json
 {"ts":"2026-07-11T11:00:24-07:00","requests":111,"cap":200,"concurrency":0,"reset":"3h 57m"}
 ```
